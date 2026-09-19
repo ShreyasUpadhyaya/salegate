@@ -23,6 +23,8 @@ Depth on one path beats breadth.
 | Guardrails and judgment (10%) | Low-confidence routing, PCI redaction, consent as a check, overrides logged, no auto-correction | Crosstalk/mishear/silence tests pass without false criticals |
 
 ## Architecture
+Audio source: `data/recordings/demo/call.wav`, self-recorded from our own script, single channel,
+diarized. CIMET provided no recording, only a flat transcript. See DECISIONS D17.
 ```
 dialler_sim.py --POST--> /api/dialler/recordings (lead_id, call_started_at, agent_id, audio)
                               |  202 Accepted, idempotent on lead_id + sha256(audio)
@@ -30,7 +32,7 @@ dialler_sim.py --POST--> /api/dialler/recordings (lead_id, call_started_at, agen
                     data/recordings/<lead_id>/<sha>.wav  (gitignored)
                               |  background task
                               v
-                 Deepgram pre-recorded REST (nova-3, diarize or multichannel,
+                 Deepgram pre-recorded REST (nova-3, diarize=true, single channel,
                  utterances, smart_format, redact=pci, keyterms)  -> cache/deepgram/<sha>.json
                               v
                  transcripts: utterances(speaker, start, end, text, confidence) + words
@@ -79,7 +81,7 @@ A PASS with empty evidence is a bug. Tests enforce it.
 ## Guardrails mapped to implementation
 | Handout constraint | Implementation |
 |---|---|
-| Test data only | Only CIMET synthetic leads and provided files. Real recording and its transcript never committed (gitignored). |
+| Test data only | Only CIMET synthetic leads and provided files. Our own recording carries no real customer, so it is ours to commit or publish (D17). |
 | Consent is a check | Recording disclaimer is a critical Type A check with an ordering rule. Recording existence proves nothing. |
 | No card data surfaced | Deepgram `redact=pci` at source plus a local Luhn regex pass before storage. Redaction token present -> violation flag, digits never stored. |
 | No advice, no auto-correction | Read-only on CRM fields. The system reports and holds. No writes to leads except status. |
@@ -96,7 +98,7 @@ app/api/        leads.py, scores.py, overrides.py, dashboards.py
 ui/             Home.py, pages/1_Lead_review.py, 2_Queues.py, 3_Dashboards.py, theme.py
 scripts/        dialler_sim.py, seed_history.py, eval_agreement.py, reset_db.py
 tests/          test_normalise.py, test_verbatim.py, test_factual.py, test_gate.py, test_guardrails.py
-handout/        CIMET files (gitignored if they contain the real recording)
+handout/        CIMET files: flat transcript, leads, check library (gitignored)
 results/        agreement.md, scored_leads.json, screenshots/
 docs/           data_notes.md, architecture.png (optional)
 reference/      spike/, tonight's rehearsal code, port from it, never import it, never ship it
@@ -111,7 +113,7 @@ Commit messages: plain English, max 2 lines, no prefixes, no trailers. Nothing i
 | when files land | Phase 0b: inspect handout, fill every TO FILL in `docs/data_notes.md` | No assumption in data_notes survives a real file | `Record what the CIMET handout files actually contain` |
 | 09:45 to 10:05 | uv project, FastAPI skeleton, config from .env, SQLite models | `/health` returns ok, tables create | `Set up the FastAPI app, config and SQLite models` |
 | 10:05 to 10:30 | Dialler endpoint, idempotent storage, simulator script | Simulator posts a file and a recording row appears | `Accept dialler recordings by API and store them against the lead` |
-| 10:30 to 10:55 | Deepgram transcription in background task, cache, utterances saved | Test recording transcribed with speakers and timings | `Transcribe calls with Deepgram and keep speakers and word timings` |
+| 10:30 to 10:55 | Deepgram transcription in background task (diarize=true), cache, utterances saved | Self-recorded call transcribed with speakers and timings | `Transcribe calls with Deepgram and keep speakers and word timings` |
 | 10:55 to 11:05 | Redaction pass, PCI flag | Test with a fake card number string passes | `Redact spoken card numbers before anything is stored` |
 | **11:05 checkpoint** | Ingestion works end to end with zero manual steps. If not, fall back to provided transcripts and fix later | | |
 | 11:05 to 11:30 | Check library loader: parse, classify each row A/B/C, map severity to critical and fatal, versions and effective dates | Loads CIMET export, resolves version by date, classification table written into `docs/data_notes.md` | `Load the retailer check library with versions by effective date` |
@@ -137,6 +139,12 @@ Before build day, the riskiest logic was pressure-tested against CIMET's own wor
 (Lead 3613790, Retailer 1: rate 28.6c vs plan 31.9c, email gmail.com vs CRM's gmial.com, a 47s dead air).
 This is proof-of-approach, not app code. Port it into `app/checks/` with proper types, module boundaries
 and tests per CLAUDE.md; do not import it directly or commit it into the real app.
+
+Note on audio: the spike's fixtures assume utterances that already carry speaker labels and timings.
+That now comes from Deepgram diarization of our own recording (`data/recordings/demo/call.wav`,
+single channel, D17), not from a CIMET-provided file. The spike logic is unaffected, since it starts
+from utterances either way, but the two bugs below matter more now: diarization can mis-split a turn,
+so span isolation and continuous fixtures are what keep that from becoming a false critical.
 
 **Already settled, do not re-derive:**
 - rapidfuzz thresholds 88 PASS / 72 REVIEW / below FAIL work for script checks (disclaimer, account
@@ -164,6 +172,9 @@ holds the hard rules in CLAUDE.md, whether the evidence contract and gate logic 
 it actually runs. This is a second pass, not a replacement for testing before each commit.
 
 ## Fallback if the handout arrives late or not at all
+Partly resolved: CIMET confirmed the handout is a flat transcript and no recording (D17). The audio
+fallback is gone because we make the audio ourselves. What follows still applies to the check library
+and lead data.
 Phases 5 to 7 need a check library and a lead. If `handout/` is still empty when Phase 5 starts, seed the
 library from the spike's six checks (Retailer 1, all three types) and use a synthetic lead, both labelled
 as synthetic in the UI and the README. Every mechanism still demos end to end: only the data provenance
@@ -196,7 +207,8 @@ changes. Swap in the real export the moment it lands, since the loader reads fro
    the public GitHub repo with gh, add .gitignore, and make the first commit using commit-cadence.`
 1. `Phase 1 from PLAN.md: uv project, FastAPI skeleton, config, SQLite models. Follow CLAUDE.md. Show the diff summary and run the app once.`
 2. `Phase 2: dialler endpoint + simulator. Idempotent on lead_id and sha256. Add a test. Then commit using commit-cadence.`
-3. `Phase 3: Deepgram transcription as a background task with disk cache. Check channels with ffprobe first and pick multichannel or diarize. Save utterances. Run it on the handout recording once.`
+3. `Phase 3: Deepgram transcription as a background task with disk cache. Use diarize=true (our recording is
+   single channel, see D17). Save utterances. Run it on data/recordings/demo/call.wav once.`
 4. `Phase 4: redaction pass and PCI flag with tests.`
 5. `Phase 5: check library loader with versions. Map the CIMET export fields using docs/data_notes.md.`
 6. `Phase 6: Type A evaluators using the qa-check-engine skill. Score the test call and print a results table.`

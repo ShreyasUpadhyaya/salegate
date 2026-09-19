@@ -11,6 +11,7 @@ Context: need speakers, word timings and card redaction in one call, fast, on a 
 Decision: Deepgram nova-3 via plain REST (no SDK, fewer version surprises). Consequence: depends on network; transcripts cached by audio hash.
 
 ## D3. Channels over diarization when available
+Superseded by D17. Kept for the reasoning, which still applies if a second voice or a stereo source appears.
 Context: call-centre recordings are often stereo, one channel per party. Decision: if ffprobe shows 2 channels use multichannel,
 else diarize and map speaker 0/1 to agent/customer by who reads the disclaimer. Consequence: fewer speaker errors on stereo audio.
 
@@ -42,12 +43,15 @@ Decision: SQLite file DB and Streamlit UI on top of FastAPI. Consequence: zero i
 Decision: sample clean calls by hash of lead id, not random. Consequence: the same lead is always sampled or not, which makes audits reproducible.
 
 ## D11. Real recording stays out of the public repo
+Overtaken by D17: there is no real recording, so nothing here binds. `handout/` stays gitignored anyway.
 Context: the test recording is a real sales call and the repo is public. Decision: gitignore handout/, audio and derived transcripts. See D13 for the full policy on how the recording is used and written up.
 
 ## D12. Dashboards run on seeded history
 Context: one real call cannot show weekly trends. Decision: seed_history.py generates synthetic scored leads, labelled as seeded demo data in the UI.
 
 ## D13. How the real test recording is handled
+Overtaken by D17: CIMET provided no recording, so the customer-privacy split below is moot. The masking
+habit for committed evidence text is worth keeping regardless, since it costs nothing.
 Context: CIMET hands out one real sales call recording as build material ("hear exactly how agents talk"). This is
 provided for exactly this purpose, so using it locally to build and to demo live, in front of CIMET's own judges, needs
 no extra sign-off. The only real exposure is the public GitHub repo and anything shared as a link after the event,
@@ -91,3 +95,21 @@ is written into `docs/data_notes.md`. A row that resists classification defaults
 REVIEW-biased threshold and is flagged, never silently dropped. Consequence: the classification is
 auditable in a document rather than buried in code, and a mis-typed check surfaces as REVIEW, not a
 false PASS.
+
+## D17. We record the test call ourselves, and diarization is now primary
+Context: at the opening ceremony CIMET confirmed no audio recording is provided. The handout is a flat
+transcript with no timestamps and no speaker labels, so it cannot drive a pipeline whose whole value is
+utterance timings and speaker attribution. The guardrails and the three check types are also ours to
+interpret rather than a fixed spec. Decision, in three parts:
+- `handout/transcript.txt` is source material for writing our own call script, not pipeline input. We read
+  it to learn the real script content and how agents actually talk, then write a script from it.
+- We record that script ourselves: solo, one voice performing both parts, in a single continuous take.
+  Agent lines and customer lines are read in a clearly different tone and pace, with a 1 to 2 second pause
+  between every speaker turn, so nova-3 can split the turns cleanly.
+- Because this is one microphone on one track, we send `diarize=true` and not `multichannel`. This
+  supersedes D3's channel-first ordering: diarization is now the primary path, and multichannel becomes the
+  fallback if a second voice or a stereo source becomes available later.
+Consequence: D13's real-recording privacy concern no longer applies, since there is no real customer in
+our audio. The recording is fully ours to use, commit and publish. The pipeline is unchanged in shape: it
+still ingests audio, transcribes with speakers and timings, and scores against the library. The risk moves
+from privacy to diarization quality, which the deliberate pauses and tone contrast are there to manage.
