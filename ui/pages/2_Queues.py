@@ -2,10 +2,17 @@
 
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
 import streamlit as st
 
-from ui.api_client import get_agent_rollup
-from ui.theme import decision_chip, inject_css
+# streamlit run puts this file's own directory on sys.path, not the project
+# root, so `ui.api_client` and `ui.theme` do not resolve on their own.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
+
+from ui.api_client import get_agent_rollup  # noqa: E402
+from ui.theme import decision_chip, inject_css  # noqa: E402
 
 st.set_page_config(page_title="Queues | Salegate", page_icon=":material/inbox:", layout="wide")
 inject_css()

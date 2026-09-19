@@ -2,9 +2,16 @@
 
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
 import streamlit as st
 
-from ui.theme import inject_css
+# streamlit run puts this file's own directory on sys.path, not the project
+# root, so `ui.theme` and `ui.api_client` do not resolve on their own.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from ui.theme import inject_css  # noqa: E402
 
 st.set_page_config(page_title="Salegate", page_icon=":material/fact_check:", layout="wide")
 inject_css()

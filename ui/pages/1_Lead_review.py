@@ -7,10 +7,17 @@ Clicking a marker sets the audio start time. Everything else stays quiet.
 
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
 import plotly.graph_objects as go
 import streamlit as st
 
-from ui.api_client import (
+# streamlit run puts this file's own directory on sys.path, not the project
+# root, so `ui.api_client` and `ui.theme` do not resolve on their own.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
+
+from ui.api_client import (  # noqa: E402
     get_overrides,
     get_score,
     get_transcript,
@@ -18,7 +25,7 @@ from ui.api_client import (
     post_score,
     post_submit,
 )
-from ui.theme import (
+from ui.theme import (  # noqa: E402
     INK,
     MUTED,
     RULE,
