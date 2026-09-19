@@ -303,3 +303,31 @@ def test_rescoring_the_same_lead_only_counts_once_in_the_rollup(client):
 
     row = next(r for r in rows if r["agent_id"] == "A-007")
     assert row["total_scored"] == 1
+
+
+def test_transcript_returns_the_utterances(client):
+    response = client.get(f"/api/leads/{LEAD_ID}/transcript")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["lead_id"] == LEAD_ID
+    assert len(body["utterances"]) == len(CLEAN_TURNS)
+    assert body["utterances"][0]["text_redacted"] == CLEAN_TURNS[0][4]
+
+
+def test_transcript_404s_for_a_lead_with_no_recording(client):
+    with client.session_factory() as session:
+        session.add(
+            Lead(
+                lead_id="L-NO-REC-2",
+                retailer=RETAILER,
+                agent_id="A-001",
+                call_started_at=CALL_DATE,
+                crm_fields={},
+            )
+        )
+        session.commit()
+
+    response = client.get("/api/leads/L-NO-REC-2/transcript")
+
+    assert response.status_code == 404

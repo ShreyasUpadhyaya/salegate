@@ -8,11 +8,12 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.checks.library import load_all
 from app.db import get_session
-from app.models import CheckResult, Lead, Score
+from app.models import CheckResult, Lead, Recording, Score, Utterance
 from app.scoring.gate import DECISION_AUTO_SUBMIT
 from app.scoring.scorer import ScoringError, latest_score, score_lead
 
@@ -61,6 +62,24 @@ class SubmitOut(BaseModel):
     lead_id: str
     status: str
     decision: str
+
+
+class UtteranceOut(BaseModel):
+    idx: int
+    speaker: str
+    start_s: float
+    end_s: float
+    text_redacted: str
+    avg_confidence: float
+    speaker_source: str
+
+
+class TranscriptOut(BaseModel):
+    lead_id: str
+    recording_id: int
+    duration_s: float | None
+    audio_path: str
+    utterances: list[UtteranceOut]
 
 
 def _effective_status(session: Session, check_result: CheckResult) -> str:
@@ -130,6 +149,45 @@ def get_score(lead_id: str, session: Session = Depends(get_session)) -> ScoreOut
     _require_lead(session, lead_id)
     score = _require_score(session, lead_id)
     return _score_out(session, score)
+
+
+@router.get("/{lead_id}/transcript", response_model=TranscriptOut)
+def get_transcript(lead_id: str, session: Session = Depends(get_session)) -> TranscriptOut:
+    """The lead's latest recording's utterances, for the review screen's
+    transcript panel and click-to-play. Read-only: nothing here can edit a
+    transcript or a lead field (hard rule 5).
+    """
+    _require_lead(session, lead_id)
+    recording = session.scalars(
+        select(Recording).where(Recording.lead_id == lead_id).order_by(Recording.id.desc())
+    ).first()
+    if recording is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"lead {lead_id} has no recording"
+        )
+
+    rows = session.scalars(
+        select(Utterance).where(Utterance.recording_id == recording.id).order_by(Utterance.idx)
+    ).all()
+
+    return TranscriptOut(
+        lead_id=lead_id,
+        recording_id=recording.id,
+        duration_s=recording.duration_s,
+        audio_path=recording.path,
+        utterances=[
+            UtteranceOut(
+                idx=r.idx,
+                speaker=r.speaker,
+                start_s=r.start_s,
+                end_s=r.end_s,
+                text_redacted=r.text_redacted,
+                avg_confidence=r.avg_confidence,
+                speaker_source=r.speaker_source,
+            )
+            for r in rows
+        ],
+    )
 
 
 @router.get("/{lead_id}/gate", response_model=GateOut)
