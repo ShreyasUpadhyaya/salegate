@@ -204,3 +204,23 @@ that floor is applied, since an unresolved speaker is itself a reason not to tru
 Consequence: the same engine now gives an honest answer on both a tight verbatim line and a five-sentence
 read, without a threshold tuned to either one specifically. See D19 for what this actually found on the
 self-recorded call: two coverage checks FAIL on paraphrase, not on engine error.
+
+## D20 addendum: window trimming and a confirmation near-miss band
+Two follow-ups after the first Phase 6 commit, both found by rerunning against the real call rather
+than by inspection.
+- Verbatim and coverage scoring now trims a candidate window to its best-aligned span before running
+  `token_set_ratio`, so a turn whose text runs on past a missed speaker boundary (D18) does not get
+  diluted by the leftover words. `partial_ratio` already does its own substring alignment and needed no
+  change. On the real call this did not move `recording_disclaimer` off REVIEW (82 vs the 85 measured
+  before): the gap there is a genuine wording difference between the recording and v1's approved text, not
+  window contamination, confirmed by checking that `partial_ratio` alone already reflected the same gap.
+  `_best_window` was already agent-turns-only, so no customer turn could enter a window; the real defect
+  was scoring a whole turn's text rather than its matched span.
+- Confirmation mode gained a near-miss band. A question scoring 60 to 79 (`CONFIRMATION_NEAR_MISS_THRESHOLD`
+  to `CONFIRMATION_QUESTION_THRESHOLD`) with a customer affirmative within the reply window now returns
+  REVIEW, evidence citing both turns, rather than a flat FAIL. Below 60 stays FAIL outright: that is not a
+  wording variant of the checklist question, it is a different question. Approved text is untouched.
+  On the real call `account_holder_confirmation` scores 54, below the near-miss floor, so it correctly
+  stays FAIL rather than softening into REVIEW: the recording's "can I confirm you are the account holder"
+  is enough removed from both v1 phrasings that treating it as the same exchange would be a stretch, not a
+  near-miss.

@@ -36,6 +36,9 @@ COVERAGE_SENTENCE_THRESHOLD = 80
 
 # A confirmation question must score at least this well to count as asked.
 CONFIRMATION_QUESTION_THRESHOLD = 80
+# Below the pass threshold but at or above this, the question is a plausible
+# near-miss: a confirming reply routes it to REVIEW instead of a flat FAIL.
+CONFIRMATION_NEAR_MISS_THRESHOLD = 60
 # How many customer turns after the question count as "the reply".
 CONFIRMATION_REPLY_WINDOW = 2
 
@@ -80,8 +83,47 @@ def _evidence(turns: list[TurnDict]) -> list[dict[str, Any]]:
 
 
 def _score_window(joined: str, approved: str) -> float:
+    """Score the approved text against the best-aligned span inside `joined`.
+
+    A window can be a single agent turn whose text runs on past a speaker
+    boundary the aligner missed (D18): "Yeah. That's me. Before we go any
+    further...". Scoring the whole turn lets that leading fragment drag a
+    verbatim line's score down. partial_ratio already finds the best
+    substring alignment internally, but token_set_ratio does not, so it is
+    run against a trimmed candidate: the words partial_ratio's own alignment
+    says the approved text overlaps, plus a small margin either side.
+    """
     a, b = _normalise(joined), _normalise(approved)
-    return max(fuzz.partial_ratio(a, b), fuzz.token_set_ratio(a, b))
+    if not a or not b:
+        return 0.0
+    partial = fuzz.partial_ratio(a, b)
+    trimmed = _trim_to_best_span(a, b)
+    token_set = fuzz.token_set_ratio(trimmed, b)
+    return max(partial, token_set)
+
+
+def _trim_to_best_span(candidate: str, approved: str) -> str:
+    """The run of words in `candidate` most likely to contain `approved`.
+
+    Slides a window the length of `approved` (plus margin) over `candidate`'s
+    words and keeps whichever position scores best against `approved`. This
+    keeps a contaminating word or two at either end of a turn from diluting
+    token_set_ratio, which otherwise scores the whole bag of words.
+    """
+    words = candidate.split()
+    target_len = len(approved.split())
+    if len(words) <= target_len:
+        return candidate
+
+    margin = 3
+    span = min(len(words), target_len + margin)
+    best_text, best_score = candidate, 0.0
+    for start in range(0, len(words) - span + 1):
+        chunk = " ".join(words[start : start + span])
+        score = fuzz.partial_ratio(chunk, approved)
+        if score > best_score:
+            best_score, best_text = score, chunk
+    return best_text
 
 
 def _best_window(
@@ -241,7 +283,7 @@ def score_confirmation_check(check: CheckDefinition, turns: list[TurnDict]) -> C
         if score > best_score:
             best_score, best_idx = score, i
 
-    if best_idx is None or best_score < CONFIRMATION_QUESTION_THRESHOLD:
+    if best_idx is None or best_score < CONFIRMATION_NEAR_MISS_THRESHOLD:
         reason = f"{check.title}: {check.reason_fail or 'question was never asked'}."
         return CheckResultDict(
             check_id=check.check_id,
@@ -266,23 +308,34 @@ def score_confirmation_check(check: CheckDefinition, turns: list[TurnDict]) -> C
         if seen_customer >= CONFIRMATION_REPLY_WINDOW:
             break
 
-    evidence_turns = [question_turn] + ([reply_turn] if reply_turn else [])
-    avg_conf = sum(_turn_confidence(t) for t in evidence_turns) / len(evidence_turns)
+    is_near_miss = best_score < CONFIRMATION_QUESTION_THRESHOLD
 
-    if reply_turn is not None:
-        status = "PASS"
-        asked, confirmed = question_turn["start_s"], reply_turn["start_s"]
-        pass_reason = check.reason_pass or "confirmed"
-        reason = (
-            f"{check.title}: {pass_reason} "
-            f"(asked at {asked:.1f}s, confirmed at {confirmed:.1f}s)."
-        )
-    else:
+    if reply_turn is None:
+        evidence_turns = [question_turn]
+        avg_conf = _turn_confidence(question_turn)
         status = "FAIL"
         reason = (
             f"{check.title}: question asked at {question_turn['start_s']:.1f}s but no "
             f"affirmative reply followed within {CONFIRMATION_REPLY_WINDOW} customer turns."
         )
+    else:
+        evidence_turns = [question_turn, reply_turn]
+        avg_conf = sum(_turn_confidence(t) for t in evidence_turns) / len(evidence_turns)
+        asked, confirmed = question_turn["start_s"], reply_turn["start_s"]
+        if is_near_miss:
+            status = "REVIEW"
+            reason = (
+                f"{check.title}: confirmation likely, wording differs from approved text "
+                f"(question score {best_score:.0f}; asked at {asked:.1f}s, "
+                f"confirmed at {confirmed:.1f}s)."
+            )
+        else:
+            status = "PASS"
+            pass_reason = check.reason_pass or "confirmed"
+            reason = (
+                f"{check.title}: {pass_reason} "
+                f"(asked at {asked:.1f}s, confirmed at {confirmed:.1f}s)."
+            )
 
     status, reason = _confidence_downgrade(status, avg_conf, reason)
 

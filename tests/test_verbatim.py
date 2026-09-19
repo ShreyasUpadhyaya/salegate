@@ -47,6 +47,20 @@ def snapshot():
 # ---------------------------------------------------------------------------
 
 
+def test_a_customer_turn_never_contaminates_the_matched_window(snapshot):
+    """A customer reply right after the agent's line must not leak into scoring."""
+    check = snapshot.by_id("recording_disclaimer")
+    turns = [
+        turn(0, "agent", 10.0, 15.0, "Please be advised that this call will be recorded for quality assurance and training purposes."),
+        turn(1, "customer", 15.5, 17.0, "No way, I'm not okay with any of that, absolutely not."),
+    ]
+
+    result = score_type_a_check(check, turns)
+
+    assert result["status"] == "PASS"
+    assert all(e["speaker"] == "agent" for e in result["evidence"])
+
+
 def test_verbatim_pass_on_a_close_match(snapshot):
     check = snapshot.by_id("recording_disclaimer")
     turns = [
@@ -161,6 +175,36 @@ def test_coverage_reason_names_the_missing_sentences_verbatim(snapshot):
 # ---------------------------------------------------------------------------
 # confirmation mode
 # ---------------------------------------------------------------------------
+
+
+def test_confirmation_review_on_a_near_miss_question_with_a_reply(snapshot):
+    """Score 60-79 with a confirming reply: likely the same question, different
+    wording. Routed to REVIEW rather than a flat FAIL, approved text untouched."""
+    check = snapshot.by_id("account_holder_confirmation")
+    turns = [
+        turn(0, "agent", 10.0, 13.0, "Just to confirm, is this account under your name?"),
+        turn(1, "customer", 13.5, 14.5, "Yes, I am the account holder."),
+    ]
+
+    result = score_type_a_check(check, turns)
+
+    assert result["status"] == "REVIEW"
+    assert len(result["evidence"]) == 2
+    assert "differs from approved text" in result["reason"]
+
+
+def test_confirmation_fail_when_the_question_score_is_too_low_even_with_a_reply(snapshot):
+    """Below the near-miss floor entirely: not the same question, so FAIL even
+    though something affirmative-sounding follows."""
+    check = snapshot.by_id("account_holder_confirmation")
+    turns = [
+        turn(0, "agent", 10.0, 13.0, "Hi, is this Jordan? My name's Sam calling about your plan."),
+        turn(1, "customer", 13.5, 14.5, "Yes, that's me."),
+    ]
+
+    result = score_type_a_check(check, turns)
+
+    assert result["status"] == "FAIL"
 
 
 def test_confirmation_pass_on_question_then_affirmative(snapshot):
