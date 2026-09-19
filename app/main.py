@@ -8,6 +8,9 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from pydantic import BaseModel
 
+from app.api.dashboards import router as dashboards_router
+from app.api.leads import router as leads_router
+from app.api.overrides import router as overrides_router
 from app.api.recordings import router as recordings_router
 from app.config import get_settings
 from app.db import create_all
@@ -27,6 +30,9 @@ app = FastAPI(
 )
 
 app.include_router(recordings_router)
+app.include_router(leads_router)
+app.include_router(overrides_router)
+app.include_router(dashboards_router)
 
 
 class Health(BaseModel):
