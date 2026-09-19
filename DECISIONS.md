@@ -151,3 +151,35 @@ with talk ratio 82.2% agent to 17.8% customer. The card turn is bounded to the 1
 (`CARD_LEAD_IN_WORDS`); an unbounded cut reached back to the start of the call and collapsed all 4.5 minutes
 into one customer turn. After a forced cut the script pointer resyncs by searching the rest of the script,
 still forward only, because a card turn can span several script lines and the token itself matches none.
+
+## D19. The checklist is derived from the CIMET transcript, because no library export was provided
+Context: `handout/` contains `transcript.pdf` and nothing else. There is no check-library export, no lead
+dataset and no sandbox payload. The spike's six checks cannot stand in: they are energy checks (DMO, cents
+per kWh, peak and off-peak tariffs) and this call sells NBN broadband, so every threshold and extractor in
+them is for the wrong domain. Decision: build the retailer checklist from what the real agent actually says
+in `handout/transcript.pdf`. Type A approved text is quoted from the transcript, cleaned only of
+transcription artefacts (run-together words, the agent's filler "K?"). Type B checks are taken from the
+data points the real call handles, corrected to the internet domain: monthly promo and ongoing price,
+promo term, download speed, modem model, email, date of birth, service address. Type C is dead air,
+interruptions and talk ratio, none of them critical, none of them blocking. The library lives as tracked
+JSON in `app/checks/library/`, not in `data/`, which is gitignored. Two versions ship: v1 effective
+2026-01-01 to 2026-09-30 and v2 from 2026-10-01 with a reworded disclaimer, which exists only to prove the
+scorer resolves by call date (hard rule 8). The 2026-09-19 demo call resolves to v1, tested on both sides
+of the boundary.
+Consequence and findings, all of which are demo material rather than problems to hide:
+- The source call fails its own disclaimer ordering rule. The agent confirms the service address twice
+  before saying "please be advised that this call will be recorded". The rule is written as the control
+  should be, so the real call FAILS it. This is the clearest illustration of why the ordering rule exists.
+- The source call contains no explicit consent to switch. There is no "do you understand and agree"
+  anywhere in it; the customer consents by ticking boxes in a web form. `consent_to_switch` is therefore
+  marked `derived: true` with a source note, since its approved text is the control the absence implies
+  rather than a quote. It is the only Type A check here not taken verbatim from the handout.
+- No card data appears in the source. The agent muted the recording before payment, which is the compliant
+  behaviour our own script mirrors with the agent's refusal line.
+- Scored against v1, the self-recorded call gives: recording_disclaimer PASS 89.6,
+  agent_and_company_identification PASS 92.1, consent_to_switch PASS 100.0,
+  account_holder_confirmation REVIEW 86.2, plan_key_information FAIL 62.2,
+  total_minimum_cost_disclosed FAIL 58.5. The three non-passes are paraphrase gaps between the recording
+  and the real agent's wording, not engine faults. Thresholds were not lowered and the approved text was
+  not rewritten to match the recording, because a checklist tuned until the demo passes measures nothing.
+  Two critical checks failing on wording is a truthful result and a better demo than a clean sheet.

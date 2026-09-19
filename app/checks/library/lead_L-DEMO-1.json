@@ -1,0 +1,42 @@
+{
+  "synthetic": true,
+  "synthetic_note": "Fictional test lead. Every value is invented for the demo and matches the self-recorded call in data/recordings/demo/call.wav. No real customer, no real address, no real contact detail. See CLAUDE.md hard rule 1 and DECISIONS D17.",
+  "lead_id": "L-DEMO-1",
+  "retailer": "PROVIDER_A",
+  "agent_id": "A-007",
+  "tl_id": "TL-001",
+  "site": "Demo",
+  "campaign": "NBN Winter Switch",
+  "call_started_at": "2026-09-19T10:05:00",
+  "plan_code": "NBN25-PROMO6",
+  "status": "NEW",
+  "crm_fields": {
+    "full_name": "Jordan Avery",
+    "email": "jordan.avery@example.com",
+    "dob": "1990-03-14",
+    "service_address": "12 Sample Street, Testville NSW 2000",
+    "previous_provider": "iPrimus",
+    "previous_account_number": "ACC44721"
+  },
+  "rate_card": {
+    "plan_name": "NBN 25",
+    "download_speed_mbps": 25,
+    "upload_speed_mbps": 8.5,
+    "promo_price_monthly": 42.90,
+    "promo_term_months": 6,
+    "ongoing_price_monthly": 72.90,
+    "total_minimum_cost": 42.90,
+    "modem_model": "Netcomm CF40",
+    "modem_cost": 0.0,
+    "setup_fee": 0.0,
+    "contract": "month to month"
+  },
+  "expected_outcome": {
+    "note": "What this call should score, used as the hand label in Phase 12.",
+    "ongoing_monthly_price": "FAIL, agent said 79.90 twice, rate card says 72.90",
+    "customer_email": "FAIL, agent read back j.avery@example.com, CRM holds jordan.avery@example.com",
+    "recording_disclaimer": "PASS, given before any personal data",
+    "dead_air": "NOTE, one gap of about 24 seconds",
+    "gate_decision": "HELD_TL, two critical Type B failures"
+  }
+}
