@@ -1,0 +1,50 @@
+{
+  "note": "Hand labels for the two self-recorded demo calls, written by listening/reading the actual call against its script and the CRM/rate card fixture. Not the intended script outcome: what a human reviewer would actually mark, given what was actually said. Synthetic leads, no real customer (D17).",
+  "L-DEMO-1": {
+    "recording_disclaimer": "PASS",
+    "account_holder_confirmation": "FAIL",
+    "plan_key_information": "FAIL",
+    "total_minimum_cost_disclosed": "FAIL",
+    "consent_to_switch": "PASS",
+    "agent_and_company_identification": "PASS",
+    "promo_monthly_price": "PASS",
+    "ongoing_monthly_price": "FAIL",
+    "promo_term_months": "PASS",
+    "plan_download_speed": "PASS",
+    "modem_model": "REVIEW",
+    "customer_email": "FAIL",
+    "customer_dob": "PASS",
+    "service_address": "PASS",
+    "notes": {
+      "recording_disclaimer": "Agent gives the disclaimer at 12.4s, before any personal data is collected. Wording is a close paraphrase of the checklist text, not verbatim. A human reviewer would call this a clean PASS on substance even though the automated score sits at REVIEW (score 82, just under the 88 PASS threshold): this is the one place the model is stricter than a human would be.",
+      "account_holder_confirmation": "The agent asks 'can I confirm you are the account holder', which is a real account-holder confirmation in substance, but reads nothing like the checklist's exact phrasing derived from the CIMET transcript. A human reviewer familiar with the checklist would likely also flag this as not matching the approved script, so FAIL is defensible, though a lenient reviewer could argue REVIEW.",
+      "plan_key_information": "The CIS-style plan read is present but compressed; several required sentences (month-to-month terms, the explicit ongoing price restatement) are missing or paraphrased away. FAIL on substance, not just wording.",
+      "total_minimum_cost_disclosed": "The total minimum cost sentence is not said at all in this recording. Clear FAIL.",
+      "ongoing_monthly_price": "Agent states 79.90 twice; the rate card says 72.90. This is the deliberate script fault. Clear FAIL.",
+      "customer_email": "Agent reads back j.avery@example.com; CRM holds jordan.avery@example.com. Deliberate script fault. Clear FAIL.",
+      "modem_model": "The modem is named correctly (Netcomm CF40) but the line lands on a customer-attributed turn under speaker alignment (D18), so the automated check finds no agent-side mention and REVIEWs. A human listening to the audio would hear the agent say it and PASS this. This is the review's known false REVIEW, not a real content problem."
+    }
+  },
+  "L-DEMO-2": {
+    "recording_disclaimer": "PASS",
+    "account_holder_confirmation": "PASS",
+    "plan_key_information": "PASS",
+    "total_minimum_cost_disclosed": "PASS",
+    "consent_to_switch": "PASS",
+    "agent_and_company_identification": "PASS",
+    "promo_monthly_price": "PASS",
+    "ongoing_monthly_price": "PASS",
+    "promo_term_months": "PASS",
+    "plan_download_speed": "PASS",
+    "modem_model": "PASS",
+    "customer_email": "PASS",
+    "customer_dob": "PASS",
+    "service_address": "PASS",
+    "notes": {
+      "ongoing_monthly_price": "Scripted and spoken correctly: 72.90 is the only ongoing figure said in this call. The automated FAIL is a known false positive: a long merged turn under speaker alignment (D18) confuses the promo-vs-ongoing role tagger into reading the promo mention as a second, conflicting ongoing claim. A human listening to the audio hears one correct figure and would PASS this.",
+      "promo_monthly_price": "Same root cause as ongoing_monthly_price: the correct 42.90 promo figure is said once, correctly, but the same merged-turn confusion produces a false FAIL.",
+      "total_minimum_cost_disclosed": "The total minimum cost sentence is said in full and correctly in the recording. The automated FAIL traces to the same long merged turn: the sentence is present in the transcript but the coverage matcher's evidence window does not land cleanly on it inside that turn.",
+      "customer_email": "priya.shah@example.com is read back correctly and matches the CRM record exactly. The automated REVIEW happens because the email sentence sits inside the same long merged turn (70.6s-123.0s) and the span-isolation extractor does not find it there; the extractor is not wrong about what it can see, it simply cannot see this particular sentence inside that turn."
+    }
+  }
+}

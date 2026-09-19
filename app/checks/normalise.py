@@ -114,9 +114,15 @@ _NUMBER_WORD = (
     r"seventy|eighty|ninety|twelve|eleven|thirty|forty|fifty|sixty|twenty|"
     r"zero|one|two|three|four|five|six|seven|eight|nine|ten)\b"
 )
+# A disfluency ("uh", "um", "er") can interrupt a spoken number ("seventy uh
+# two"). Each repeated unit optionally swallows one filler word ahead of the
+# next number word, which absorbs that without reopening the unbounded-repeat
+# risk the D21 ReDoS fix removed.
+_FILLER = r"(?:uh|um|er|erm)[\s-]+"
+_NUMBER_UNIT = rf"(?:{_FILLER})?{_NUMBER_WORD}"
 _MONEY_WORD_SPAN = re.compile(
-    rf"((?:{_NUMBER_WORD}[\s-]?){{1,4}})\s*dollars?\s*(?:and\s*)?"
-    rf"((?:{_NUMBER_WORD}[\s-]?){{1,3}})?(?:\s*cents?)?"
+    rf"((?:{_NUMBER_UNIT}[\s-]?){{1,4}})\s*dollars?\s*(?:and\s*)?"
+    rf"((?:{_NUMBER_UNIT}[\s-]?){{1,3}})?(?:\s*cents?)?"
 )
 
 

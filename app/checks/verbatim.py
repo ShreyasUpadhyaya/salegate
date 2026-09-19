@@ -294,11 +294,24 @@ def score_confirmation_check(check: CheckDefinition, turns: list[TurnDict]) -> C
             best_score, best_idx = score, i
 
     if best_idx is None or best_score < CONFIRMATION_NEAR_MISS_THRESHOLD:
-        reason = f"{check.title}: {check.reason_fail or 'question was never asked'}."
+        if not turns:
+            # No transcript at all is a data problem, not evidence the agent
+            # skipped the question: REVIEW, never a confident FAIL (hard rule
+            # 7, and the messy-call guardrail in PLAN.md that silence must
+            # never manufacture a false critical).
+            status, reason = (
+                "REVIEW",
+                f"{check.title}: no transcript to check against.",
+            )
+        else:
+            status, reason = (
+                "FAIL",
+                f"{check.title}: {check.reason_fail or 'question was never asked'}.",
+            )
         return CheckResultDict(
             check_id=check.check_id,
             check_version=check.version,
-            status="FAIL",
+            status=status,
             confidence=0.0,
             method="fuzzy",
             reason=reason,

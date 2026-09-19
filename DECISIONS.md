@@ -325,3 +325,31 @@ Call 2 final state: still HELD_TL, now on `ongoing_monthly_price`, `promo_monthl
 remaining cause, the long merged turn from speaker alignment. Stopping here per instruction: the
 remaining gap is the documented alignment limitation, not a new defect, and fixing it means improving
 alignment's handling of long uninterrupted agent stretches, which is out of scope for a bounded fix.
+
+## D23. Phase 12: agreement measurement and messy-call guardrails
+Context: PLAN.md Phase 12. `scripts/eval_agreement.py` scores the two self-recorded demo calls from
+their cached transcripts and compares every check against `results/hand_labels.json`, hand labels written
+by listening to each call against its script and the CRM/rate card fixture. `results/agreement.md` is
+generated, not hand-written, and quotes only check ids and statuses, never the actual email, phone, DOB or
+address (D13); both calls are synthetic (D17) so this is a formatting discipline kept for its own sake.
+Result: 22 of 28 hand-labelled checks agree (78.6%), zero critical false passes on either call. Every
+mismatch traces to an already-documented cause: the recording_disclaimer paraphrase gap and
+account_holder_confirmation library/recording gap on call 1 (D19, D20), and the long merged turn under
+speaker alignment confusing the money-role tagger and hiding the email mention on call 2 (D18, D22). In
+every mismatch the model is more cautious than the hand label, never less: it disagrees towards REVIEW or
+FAIL, never towards a PASS a human would not have given.
+Messy-call tests (`tests/test_messy_calls.py`) assert the PLAN.md guardrail directly: crosstalk, mishears
+and silence must never produce a false critical. Two real bugs surfaced while writing them, both fixed:
+- A disfluency inside a spoken number ("seventy uh two dollars and ninety") broke `_MONEY_WORD_SPAN`'s
+  contiguous number-word matching, so only the words after the filler were parsed, producing a confident
+  wrong-value FAIL instead of the correct amount. Fixed by letting each number-word unit in the pattern
+  optionally swallow one filler word ("uh", "um", "er", "erm") ahead of it, keeping the repeat bounded
+  (no return to the unbounded quantifier the D21 ReDoS fix removed).
+- Confirmation mode (D20) hardcoded FAIL whenever no question was found, which is correct when the agent
+  spoke but never asked (a real compliance gap) but wrong when there were no turns at all: an empty
+  transcript is a data problem, not evidence the agent skipped the question. Fixed to REVIEW specifically
+  when `turns` is empty, FAIL otherwise; the existing "agent talked about other things, never asked"
+  case is untouched and still FAILs, since a real chance to ask was still there and skipped.
+Both fixes were found by exercising real messy-input scenarios, not by inspection: the intended design
+(deterministic first, uncertainty routes to a human, never a manufactured critical) was already correct,
+the implementation had gaps in the edge cases the guardrail specifically tests for.
