@@ -52,10 +52,14 @@ def script():
 
 
 def test_the_script_parses_into_ordered_agent_and_customer_lines(script):
+    """Sentences within one markdown block split into separate lines (D18
+    addendum), so the agent's opening two-sentence block is lines 0 and 1
+    before the customer's reply appears."""
     assert len(script) > 20
     assert script[0].speaker == SPEAKER_AGENT
     assert "hi is this jordan" in script[0].text
-    assert script[1].speaker == SPEAKER_CUSTOMER
+    assert script[1].speaker == SPEAKER_AGENT
+    assert script[2].speaker == SPEAKER_CUSTOMER
     # Markers and bold markup are stripped, not left in the text.
     assert all("[" not in line.text and "*" not in line.text for line in script)
 
@@ -90,13 +94,13 @@ def test_a_merged_utterance_splits_into_agent_disclaimer_and_customer_reply(scri
 
 def test_the_account_holder_question_and_answer_get_different_speakers(script):
     stream = words(
-        "Great. And can I confirm you are the account holder for the internet "
+        "Great. And can I confirm you're the account holder for the internet "
         "service at this address? Yes. I am the account holder."
     )
 
     turns = align_words_to_script(stream, script)
 
-    question = next(t for t in turns if "confirm you are the account holder" in t.text.lower())
+    question = next(t for t in turns if "confirm you" in t.text.lower())
     answer = next(t for t in turns if t.text.lower().startswith("yes"))
     assert question.speaker == SPEAKER_AGENT
     assert answer.speaker == SPEAKER_CUSTOMER

@@ -222,7 +222,8 @@ class TestRealCall:
         times = [e["start_s"] for e in result["evidence"] if "79.9" in e["text_redacted"]]
         assert len(times) >= 2
         assert any(69 < t < 72 for t in times)
-        assert any(103 < t < 106 for t in times)
+        # The boundary fix keeps the repeated quote on its own agent turn.
+        assert any(107 < t < 110 for t in times)
 
     def test_email_fails(self, snapshot, turns, lead):
         check = snapshot.by_id("customer_email")

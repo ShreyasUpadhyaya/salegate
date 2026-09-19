@@ -369,8 +369,25 @@ def score_address_check(
     mismatches: list[tuple[TurnDict, str]] = []
     matches: list[TurnDict] = []
 
-    for turn in _either_speaker_turns(turns):
-        found = extract_address_span(turn.get("text_redacted", ""))
+    candidate_windows: list[list[TurnDict]] = []
+    eligible = _either_speaker_turns(turns)
+    for index, turn in enumerate(eligible):
+        candidate_windows.append([turn])
+        if index + 1 >= len(eligible):
+            continue
+        following = eligible[index + 1]
+        if (
+            following.get("speaker") == turn.get("speaker")
+            and float(following.get("start_s", 0.0))
+            <= float(turn.get("end_s", 0.0)) + 0.5
+        ):
+            candidate_windows.append([turn, following])
+
+    matched_turn_ids: set[int] = set()
+    for window in candidate_windows:
+        found = extract_address_span(
+            " ".join(turn.get("text_redacted", "") for turn in window)
+        )
         if found is None:
             continue
         found_number, found_postcode = address_parts(found)
@@ -381,9 +398,20 @@ def score_address_check(
         )
 
         if number_ok and postcode_ok and fuzzy_score >= ADDRESS_FUZZY_THRESHOLD:
-            matches.append(turn)
+            for turn in window:
+                turn_id = id(turn)
+                if turn_id not in matched_turn_ids:
+                    matches.append(turn)
+                    matched_turn_ids.add(turn_id)
         else:
-            mismatches.append((turn, found))
+            if not any(id(turn) in matched_turn_ids for turn in window):
+                mismatches.append((window[0], found))
+
+    mismatches = [
+        (turn, found)
+        for turn, found in mismatches
+        if id(turn) not in matched_turn_ids
+    ]
 
     if mismatches:
         lines = [f"{t['start_s']:.1f}s ({found!r})" for t, found in mismatches]

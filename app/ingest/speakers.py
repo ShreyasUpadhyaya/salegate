@@ -38,11 +38,19 @@ _BOLD_ITALIC = re.compile(r"[*_]+")
 _ROLE_LINE = re.compile(r"^\*{0,2}(AGENT|CUSTOMER)\*{0,2}\s*:\s*(.*)$", re.IGNORECASE)
 
 # How far ahead the aligner may look. A turn never skips more than this many
-# script lines, which stops a late line from stealing an early one.
-LOOKAHEAD_LINES = 6
+# script lines, which stops a late line from stealing an early one. Doubled
+# from 6 once script lines started splitting on sentence boundaries rather
+# than one per markdown block: the same conversational distance now spans
+# roughly twice as many script lines, so the old window could starve out a
+# line it used to reach comfortably.
+LOOKAHEAD_LINES = 12
 
 # Two candidate lines this close in score are a tie, broken by the word gap.
 TIE_MARGIN = 4.0
+# At a sentence boundary, keep a plausible earlier role rather than letting a
+# later role win on a perfect fuzzy match made from the confirmation that
+# follows it. This covers compressed values such as a spoken email.
+ROLE_TRANSITION_TIE_MARGIN = 16.0
 
 # How far before a redaction token the card turn may start. The customer's card
 # offer runs a few words into the digits; anything earlier is ordinary speech.
@@ -81,11 +89,30 @@ def normalise(text: str) -> str:
     return re.sub(r"\s+", " ", text).strip()
 
 
+_SENTENCE_SPLIT = re.compile(r"(?<=[.!?])\s+")
+
+
+def _split_sentences(text: str) -> list[str]:
+    """One markdown block can hold more than one spoken sentence.
+
+    A recording script line like "Please be advised ... purposes. Is that
+    okay with you?" is one AGENT block but two distinct things to say, each
+    with its own natural pause. Splitting on sentence boundaries gives the
+    aligner a much finer anchor: keeping it as one long "line" made the
+    length search in _claim_next_line stretch to cover both sentences, which
+    could swallow the next speaker's opening words along with it.
+    """
+    parts = re.split(_SENTENCE_SPLIT, text.strip())
+    return [p.strip() for p in parts if p.strip()]
+
+
 def parse_script(path: Path) -> list[ScriptLine]:
-    """Ordered AGENT/CUSTOMER lines from the read script.
+    """Ordered AGENT/CUSTOMER lines from the read script, one per sentence.
 
     Only lines that open with a role label are spoken. Stage directions, italic
-    notes, headings, tables and the check markers are dropped.
+    notes, headings, tables and the check markers are dropped. A markdown block
+    with more than one sentence becomes more than one ScriptLine, same speaker,
+    in order: see _split_sentences.
     """
     lines: list[ScriptLine] = []
     for raw in path.read_text(encoding="utf-8").splitlines():
@@ -96,12 +123,11 @@ def parse_script(path: Path) -> list[ScriptLine]:
         if match is None:
             continue
         speaker = match.group(1).lower()
-        spoken = normalise(match.group(2))
-        if not spoken:
-            continue
-        lines.append(
-            ScriptLine(idx=len(lines), speaker=speaker, text=spoken)
-        )
+        for sentence in _split_sentences(match.group(2)):
+            spoken = normalise(sentence)
+            if not spoken:
+                continue
+            lines.append(ScriptLine(idx=len(lines), speaker=speaker, text=spoken))
     return lines
 
 
@@ -195,6 +221,22 @@ def align_words_to_script(
         cursor += length
         pointer = line_idx + 1
 
+    return _clamp_turn_boundaries(turns)
+
+
+def _clamp_turn_boundaries(turns: list[Turn]) -> list[Turn]:
+    """A turn's end never reaches into the next turn's start.
+
+    Word slicing by cursor already guarantees turns never share a word, but
+    Deepgram's own word timings are occasionally not monotonic (one word's
+    end timestamp lands after the *next* word's timestamps), which can leave
+    a turn's reported end_s a fraction of a second past the next turn's
+    start_s even though no word is actually shared. This is timing display
+    hygiene only: it never changes which words or which speaker a turn holds.
+    """
+    for previous, current in zip(turns, turns[1:], strict=False):
+        if previous.end_s > current.start_s:
+            previous.end_s = current.start_s
     return turns
 
 
@@ -246,7 +288,7 @@ def _card_turn(words: list[dict[str, Any]]) -> Turn:
     return Turn(
         speaker=SPEAKER_CUSTOMER,
         start_s=float(words[0]["start"]),
-        end_s=float(words[-1]["end"]),
+        end_s=max(float(w["end"]) for w in words),
         text=text,
         confidence=avg_conf,
         speaker_source=SOURCE_ALIGNMENT,
@@ -275,7 +317,8 @@ def _claim_next_line(
     if limit <= 0:
         return (None, 0, 0.0)
 
-    for offset in range(min(LOOKAHEAD_LINES, len(script) - pointer)):
+    local_lines = range(min(LOOKAHEAD_LINES, len(script) - pointer))
+    for offset in local_lines:
         line_idx = pointer + offset
         line = script[line_idx]
         expected = len(line.text.split())
@@ -285,16 +328,71 @@ def _claim_next_line(
             max(1, expected - 4),
             min(limit, expected + 6) + 1,
         )
+        # Best length for THIS line first, judged only against itself: the
+        # shortest run that reaches this line's peak score, so a genuinely
+        # complete match (e.g. the postcode at the end of an address) is kept
+        # without also swallowing the next line's opening words once the
+        # score has already maxed out. The cross-line TIE_MARGIN below must
+        # never be charged against this same-line choice, or a later, complete
+        # word run for the correct line loses to an earlier, truncated one
+        # purely because it arrived through a non-zero offset.
+        line_best_length, line_best_score = 0, 0.0
+        punctuation_length = 0
+        punctuation_score = 0.0
         for length in lengths:
             run = words[cursor : cursor + length]
             if not run:
                 continue
             text = normalise(" ".join(w.get("punctuated_word", w["word"]) for w in run))
             score = _score(text, line.text)
-            # A later line must beat the earlier one outright, so equal scores
-            # keep the earliest line and the alignment stays in order.
-            if score > best[2] + (TIE_MARGIN if offset else 0.0):
-                best = (line_idx, length, score)
+            if score > line_best_score:
+                line_best_length, line_best_score = length, score
+            if _ends_at_punctuation(run) and score > punctuation_score:
+                punctuation_length, punctuation_score = length, score
+
+        # A fuzzy match can gain a few points by borrowing the first word of
+        # the next scripted line. Prefer a natural sentence boundary when it
+        # is nearly as good as the best run. This matters when STT drops a
+        # filler word or compresses a spoken email into one token: the extra
+        # word otherwise shifts the next role to the wrong speaker.
+        if (
+            punctuation_length
+            and punctuation_score >= line_best_score - 8.0
+        ):
+            line_best_length, line_best_score = punctuation_length, punctuation_score
+
+        # A later line must beat the earlier one outright, so equal scores
+        # keep the earliest line and the alignment stays in order.
+        transition_margin = (
+            ROLE_TRANSITION_TIE_MARGIN
+            if offset
+            and _ends_at_punctuation(words[cursor : cursor + line_best_length])
+            and line.speaker != script[pointer].speaker
+            else TIE_MARGIN if offset else 0.0
+        )
+        if line_best_score > best[2] + transition_margin:
+            best = (line_idx, line_best_length, line_best_score)
+
+    if best[0] is None or best[2] < SPEAKER_MATCH_MIN_SCORE:
+        # A short fixture or a resumed recording may start well inside the
+        # script. The normal window deliberately stays narrow to prevent late
+        # repeated lines stealing an earlier one, but when nothing in that
+        # window matches, a forward-only recovery scan is safe and avoids
+        # turning an otherwise known role into unknown.
+        for line_idx in range(pointer + LOOKAHEAD_LINES, len(script)):
+            line = script[line_idx]
+            expected = len(line.text.split())
+            lengths = range(max(1, expected - 4), min(limit, expected + 6) + 1)
+            for length in lengths:
+                run = words[cursor : cursor + length]
+                text = normalise(
+                    " ".join(w.get("punctuated_word", w["word"]) for w in run)
+                )
+                score = _score(text, line.text)
+                if score > best[2]:
+                    best = (line_idx, length, score)
+            if best[2] >= SPEAKER_MATCH_MIN_SCORE:
+                break
 
     if best[0] is None or best[2] < SPEAKER_MATCH_MIN_SCORE:
         # Nothing convincing. Emit the words up to the next real pause as one
@@ -302,6 +400,14 @@ def _claim_next_line(
         length = min(_run_to_pause(words, cursor), limit)
         return (pointer, length, 0.0) if length else (None, 0, 0.0)
     return best
+
+
+def _ends_at_punctuation(words: list[dict[str, Any]]) -> bool:
+    """Whether the final transcript token marks a spoken sentence boundary."""
+    if not words:
+        return False
+    token = str(words[-1].get("punctuated_word", words[-1].get("word", "")))
+    return bool(re.search(r"[.!?]$", token))
 
 
 def _run_to_pause(words: list[dict[str, Any]], cursor: int) -> int:
@@ -319,7 +425,7 @@ def _unmatched_turn(words: list[dict[str, Any]]) -> Turn:
     return Turn(
         speaker=SPEAKER_UNKNOWN,
         start_s=float(words[0]["start"]),
-        end_s=float(words[-1]["end"]),
+        end_s=max(float(w["end"]) for w in words),
         text=text,
         confidence=min(avg_conf, UNKNOWN_SPEAKER_CONFIDENCE),
         speaker_source=SOURCE_ALIGNMENT,
@@ -340,7 +446,7 @@ def _make_turn(
     return Turn(
         speaker=speaker,
         start_s=float(words[0]["start"]),
-        end_s=float(words[-1]["end"]),
+        end_s=max(float(w["end"]) for w in words),
         text=text,
         # An unresolved speaker must not let a critical check PASS (hard rule 7).
         confidence=avg_conf if confident else min(avg_conf, UNKNOWN_SPEAKER_CONFIDENCE),

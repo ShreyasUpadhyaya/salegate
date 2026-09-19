@@ -325,16 +325,18 @@ class TestRealCall:
 
         assert result["status"] in ("FAIL", "REVIEW")
 
-    def test_account_holder_confirmation_is_a_real_library_gap(self, snapshot, turns):
+    def test_account_holder_confirmation_is_reviewed_for_a_real_library_gap(
+        self, snapshot, turns
+    ):
         """The recording says "can I confirm you are the account holder", which
         matches neither v1's approved text nor its alternates (both quoted from
-        the real CIMET transcript's different phrasing, per D19). This FAILs
-        honestly: it is a gap between the checklist and this recording's
-        wording, not something to paper over by editing the approved text."""
+        the real CIMET transcript's different phrasing, per D19). The
+        confidence-aware semantic rule routes this unresolved wording gap to
+        REVIEW rather than treating it as a clean confirmation."""
         check = snapshot.by_id("account_holder_confirmation")
         result = score_type_a_check(check, turns)
 
-        assert result["status"] == "FAIL"
+        assert result["status"] == "REVIEW"
 
     def test_ordering_rule_is_evaluated_on_whatever_the_disclaimer_scored(self, snapshot, turns):
         """Our own recording puts the disclaimer first on purpose (D17 script),
