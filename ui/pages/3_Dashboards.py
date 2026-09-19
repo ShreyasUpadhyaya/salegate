@@ -43,7 +43,7 @@ df = df.rename(
 st.subheader("By agent")
 st.dataframe(
     df.style.format({"First pass yield": "{:.0%}", "Critical fail rate": "{:.0%}"}),
-    use_container_width=True,
+    width="stretch",
     hide_index=True,
 )
 
@@ -56,11 +56,11 @@ with col_a:
     fig = px.bar(df, x="Agent", y="First pass yield", color_discrete_sequence=[PASS])
     fig.update_yaxes(tickformat=".0%", range=[0, 1])
     fig.update_layout(showlegend=False, margin={"l": 10, "r": 10, "t": 10, "b": 10}, height=320)
-    st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+    st.plotly_chart(fig, width="stretch", config={"displayModeBar": False})
 
 with col_b:
     st.subheader("Critical fail rate by agent")
     fig = px.bar(df, x="Agent", y="Critical fail rate", color_discrete_sequence=[FAIL])
     fig.update_yaxes(tickformat=".0%", range=[0, 1])
     fig.update_layout(showlegend=False, margin={"l": 10, "r": 10, "t": 10, "b": 10}, height=320)
-    st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+    st.plotly_chart(fig, width="stretch", config={"displayModeBar": False})

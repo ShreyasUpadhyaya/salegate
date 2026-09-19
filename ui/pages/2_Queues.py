@@ -49,4 +49,4 @@ for row in sorted(rows, key=lambda r: -r["held_tl"]):
         cols[4].caption(f"First pass yield {fpy:.0f}% · Critical fail rate {cfr:.0f}%")
 
 st.divider()
-st.page_link("pages/1_Lead_review.py", label="Open a lead in Lead review")
+st.caption("Open **Lead review** from the sidebar to look at a specific lead.")
