@@ -52,13 +52,15 @@ def words_to_number(phrase: str) -> float | None:
 # Money
 # ---------------------------------------------------------------------------
 
-# Digit form: "$42.90", "79.90 dollars", "$79.90 a month". Either the $ sign or
-# the word "dollars" marks it as money, not just "dollars" alone: real speech
-# quotes a price as "$79.90 a month" with no spoken "dollars" at all once
-# smart_format has rendered it as a currency figure.
+# Digit form: "$42.90", "79.90 dollars", "$79.90 a month", "$42 and 90". Either
+# the $ sign or the word "dollars" marks it as money. The trailing cents can be
+# a decimal ("$42.90"), or spoken out as "and 90" with no "cents" word at all:
+# Deepgram's smart_format sometimes renders "forty two dollars and ninety" as
+# "$42 and 90" rather than "$42.90" when it never heard the word "cents".
+# "and 90" after a bare dollar figure is accepted as cents on that basis alone.
 _MONEY_DIGIT_SPAN = re.compile(
     r"(?:\$\s*(\d+(?:\.\d{1,2})?)|(\d+(?:\.\d{1,2})?)\s*dollars?)"
-    r"(?:\s*(?:and\s*)?(\d{1,2})\s*cents?)?"
+    r"(?:\s*and\s*(\d{1,2})\s*cents?\b|\s*and\s*(\d{1,2})\b|\s*(\d{1,2})\s*cents?\b)?"
 )
 
 # Spoken form: "forty two dollars and ninety", "seventy nine ninety". Word
@@ -133,9 +135,10 @@ def extract_money_mentions(text: str) -> list[tuple[float, str]]:
     values: list[tuple[float, str]] = []
 
     for match in _MONEY_DIGIT_SPAN.finditer(text):
-        dollar_sign_form, word_form, cents_str = match.groups()
+        dollar_sign_form, word_form, and_cents, and_bare, cents_word = match.groups()
         dollars_str = dollar_sign_form or word_form
         dollars = float(dollars_str)
+        cents_str = and_cents or and_bare or cents_word
         if cents_str and "." not in dollars_str:
             dollars += int(cents_str) / 100
         values.append((round(dollars, 2), _role_near(text, match.start(), match.end())))

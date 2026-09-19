@@ -1,0 +1,38 @@
+{
+  "synthetic": true,
+  "synthetic_note": "Fictional test lead. Every value is invented for the demo and matches the self-recorded clean call in data/recordings/demo/call2.wav. No real customer. See CLAUDE.md hard rule 1 and DECISIONS D17.",
+  "lead_id": "L-DEMO-2",
+  "retailer": "PROVIDER_A",
+  "agent_id": "A-007",
+  "tl_id": "TL-001",
+  "site": "Demo",
+  "campaign": "NBN Winter Switch",
+  "call_started_at": "2026-09-19T11:00:00",
+  "plan_code": "NBN25-PROMO6",
+  "status": "NEW",
+  "crm_fields": {
+    "full_name": "Priya Shah",
+    "email": "priya.shah@example.com",
+    "dob": "1988-07-22",
+    "service_address": "7 Example Road, Testville NSW 2000",
+    "previous_provider": "iPrimus",
+    "previous_account_number": "ACC90112"
+  },
+  "rate_card": {
+    "plan_name": "NBN 25",
+    "download_speed_mbps": 25,
+    "upload_speed_mbps": 8.5,
+    "promo_price_monthly": 42.90,
+    "promo_term_months": 6,
+    "ongoing_price_monthly": 72.90,
+    "total_minimum_cost": 42.90,
+    "modem_model": "Netcomm CF40",
+    "modem_cost": 0.0,
+    "setup_fee": 0.0,
+    "contract": "month to month"
+  },
+  "expected_outcome": {
+    "note": "Written as the intended clean-call script. The as-recorded result differs because Deepgram transcribes some numbers in digit form where the checklist's approved text (derived from the CIMET transcript, D19) uses word form, and because a few sentences of the plan read landed inside one long merged turn under speaker alignment (D18). See D22 for the actual scored outcome.",
+    "intended": "All Type A PASS, all Type B PASS, dead air NOTE only, gate AUTO_SUBMIT or QA_REVIEW by 5% sample."
+  }
+}
