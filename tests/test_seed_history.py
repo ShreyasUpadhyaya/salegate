@@ -17,9 +17,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
 @pytest.fixture
 def db(tmp_path, monkeypatch):
-    from app.config import Settings
     import app.db as db_module
     import scripts.seed_history as seed_history
+    from app.config import Settings
 
     settings = Settings(_env_file=None, db_path=tmp_path / "app.db")
     settings.ensure_dirs()
