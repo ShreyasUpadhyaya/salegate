@@ -4,11 +4,22 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile, status
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    Response,
+    UploadFile,
+    status,
+)
 from sqlalchemy.orm import Session
 
 from app.db import get_session
 from app.ingest.dialler import RecordingAccepted, store_recording
+from app.ingest.transcribe import transcribe_in_background
 from app.models import Lead
 
 router = APIRouter(prefix="/api/dialler", tags=["dialler"])
@@ -21,6 +32,7 @@ router = APIRouter(prefix="/api/dialler", tags=["dialler"])
 )
 async def receive_recording(
     response: Response,
+    background_tasks: BackgroundTasks,
     lead_id: str = Form(...),
     call_started_at: datetime = Form(...),
     agent_id: str = Form(...),
@@ -60,4 +72,7 @@ async def receive_recording(
 
     if result.duplicate:
         response.status_code = status.HTTP_200_OK
+    else:
+        # Transcription runs after the response, so the dialler is not held open.
+        background_tasks.add_task(transcribe_in_background, result.recording_id)
     return result
