@@ -146,3 +146,8 @@ channel, which is the real fix. It is honest to show because we own the script b
 Measured on the demo call: 8 of 9 check-bearing lines attributed correctly before the redaction-token rule,
 talk ratio 87.2% agent to 12.8% customer, and turn boundaries land within a word or two of the true change,
 which the windowed Type A matching absorbs.
+Added after the first commit: the redaction-token boundary rule is live and the demo call now scores 9 of 9,
+with talk ratio 82.2% agent to 17.8% customer. The card turn is bounded to the 12 words before the token
+(`CARD_LEAD_IN_WORDS`); an unbounded cut reached back to the start of the call and collapsed all 4.5 minutes
+into one customer turn. After a forced cut the script pointer resyncs by searching the rest of the script,
+still forward only, because a card turn can span several script lines and the token itself matches none.

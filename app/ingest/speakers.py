@@ -44,6 +44,10 @@ LOOKAHEAD_LINES = 6
 # Two candidate lines this close in score are a tie, broken by the word gap.
 TIE_MARGIN = 4.0
 
+# How far before a redaction token the card turn may start. The customer's card
+# offer runs a few words into the digits; anything earlier is ordinary speech.
+CARD_LEAD_IN_WORDS = 12
+
 
 @dataclass(frozen=True)
 class ScriptLine:
@@ -158,11 +162,29 @@ def align_words_to_script(
     pointer = 0  # first script line still available
 
     while cursor < len(words):
+        # A redaction token ends a turn wherever it falls. The card digits are
+        # spoken by the customer, and without a forced cut the offer, the token
+        # and the agent's refusal fuse into one agent turn (D18).
+        token_at = _next_redaction_token(words, cursor)
+        if token_at is not None and token_at - cursor <= CARD_LEAD_IN_WORDS:
+            # Only the run immediately before the token is the card turn. Words
+            # further back are ordinary speech and still align normally, which
+            # is why this is bounded rather than reaching back to the cursor.
+            turns.append(_card_turn(words[cursor : token_at + 1]))
+            cursor = token_at + 1
+            # The card run may have consumed script lines, so resync the pointer
+            # to whichever line the words after the token match. Still forward
+            # only: the search starts at the current pointer.
+            pointer = _resync_pointer(words, cursor, script, pointer)
+            continue
+
         if pointer >= len(script):
             turns.append(_unmatched_turn(words[cursor:]))
             break
 
-        line_idx, length, score = _claim_next_line(words, cursor, script, pointer)
+        line_idx, length, score = _claim_next_line(
+            words, cursor, script, pointer, stop_before=token_at
+        )
 
         if line_idx is None or length == 0:
             # Nothing ahead matches, so the rest is unattributable.
@@ -176,11 +198,70 @@ def align_words_to_script(
     return turns
 
 
+def _resync_pointer(
+    words: list[dict[str, Any]],
+    cursor: int,
+    script: list[ScriptLine],
+    pointer: int,
+) -> int:
+    """Best script line for the words after a forced cut, searching forward.
+
+    Looks further ahead than the normal step because a card turn can span
+    several script lines at once.
+    """
+    if cursor >= len(words):
+        return pointer
+    lookahead = words[cursor : cursor + 14]
+    best_idx, best_score = pointer, 0.0
+    # A card turn can swallow several script lines, and the token itself matches
+    # nothing, so the pointer can be far behind. Search the rest of the script
+    # rather than a fixed window, still forward only from `pointer`.
+    for idx in range(pointer, len(script)):
+        text = normalise(
+            " ".join(w.get("punctuated_word", w["word"]) for w in lookahead)
+        )
+        score = _score(text, script[idx].text)
+        if score > best_score:
+            best_idx, best_score = idx, score
+    return best_idx if best_score >= SPEAKER_MATCH_MIN_SCORE else pointer
+
+
+def _next_redaction_token(words: list[dict[str, Any]], cursor: int) -> int | None:
+    """Index of the next word that is a redaction token, at or after cursor."""
+    for position in range(cursor, len(words)):
+        word = words[position].get("punctuated_word", words[position]["word"])
+        if _REDACTION_TOKEN.search(str(word)):
+            return position
+    return None
+
+
+def _card_turn(words: list[dict[str, Any]]) -> Turn:
+    """The run ending in a redaction token. Always the customer (D18).
+
+    Card data is read out by the customer, never by the agent, so the token and
+    the words leading into it belong to the customer.
+    """
+    text = " ".join(w.get("punctuated_word", w["word"]) for w in words).strip()
+    avg_conf = sum(float(w.get("confidence", 0.0)) for w in words) / max(len(words), 1)
+    return Turn(
+        speaker=SPEAKER_CUSTOMER,
+        start_s=float(words[0]["start"]),
+        end_s=float(words[-1]["end"]),
+        text=text,
+        confidence=avg_conf,
+        speaker_source=SOURCE_ALIGNMENT,
+        script_idx=None,
+        match_score=0.0,
+        words=words,
+    )
+
+
 def _claim_next_line(
     words: list[dict[str, Any]],
     cursor: int,
     script: list[ScriptLine],
     pointer: int,
+    stop_before: int | None = None,
 ) -> tuple[int | None, int, float]:
     """Find the script line the next run of words belongs to, and how long it is.
 
@@ -189,6 +270,10 @@ def _claim_next_line(
     at `pointer` onwards.
     """
     best: tuple[int | None, int, float] = (None, 0, 0.0)
+    # Never run a turn past a redaction token: that boundary is not negotiable.
+    limit = len(words) - cursor if stop_before is None else stop_before - cursor
+    if limit <= 0:
+        return (None, 0, 0.0)
 
     for offset in range(min(LOOKAHEAD_LINES, len(script) - pointer)):
         line_idx = pointer + offset
@@ -198,7 +283,7 @@ def _claim_next_line(
         # disfluencies and mishears.
         lengths = range(
             max(1, expected - 4),
-            min(len(words) - cursor, expected + 6) + 1,
+            min(limit, expected + 6) + 1,
         )
         for length in lengths:
             run = words[cursor : cursor + length]
@@ -214,7 +299,7 @@ def _claim_next_line(
     if best[0] is None or best[2] < SPEAKER_MATCH_MIN_SCORE:
         # Nothing convincing. Emit the words up to the next real pause as one
         # unknown turn rather than guessing a speaker.
-        length = _run_to_pause(words, cursor)
+        length = min(_run_to_pause(words, cursor), limit)
         return (pointer, length, 0.0) if length else (None, 0, 0.0)
     return best
 

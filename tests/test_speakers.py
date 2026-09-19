@@ -219,3 +219,39 @@ def test_turns_stay_in_time_order(script):
 
     starts = [t.start_s for t in turns]
     assert starts == sorted(starts)
+
+
+def test_a_redaction_token_forces_a_turn_boundary(script):
+    """Utterance 23 on the demo call fused three turns into one (D18).
+
+    The customer's card offer, the redacted digits and the agent's refusal all
+    arrived as one agent turn, which reads as the agent reciting a card number.
+    """
+    stream = words(
+        "agree. Do you need my card now? Or it's [CREDIT_CARD_1]. Sorry, Jordan. "
+        "Please stop there. I can't take the card details over this call. "
+        "You'll get a secure payment link by email."
+    )
+
+    turns = align_words_to_script(stream, script)
+
+    card = next(t for t in turns if "[CREDIT_CARD_1]" in t.text)
+    assert card.speaker == SPEAKER_CUSTOMER
+    assert "need my card now" in card.text.lower()
+
+    refusal = next(t for t in turns if "stop there" in t.text.lower())
+    assert refusal.speaker == SPEAKER_AGENT
+    # The refusal must start after the token, never absorb it.
+    assert "[CREDIT_CARD_1]" not in refusal.text
+    assert refusal.start_s >= card.end_s
+
+
+def test_the_agent_never_owns_a_redaction_token(script):
+    """Card data is spoken by the customer, so no agent turn may carry a token."""
+    stream = words("It's [CREDIT_CARD_1]. Sorry, Jordan. Please stop there.")
+
+    turns = align_words_to_script(stream, script)
+
+    assert all(
+        "[CREDIT_CARD_1]" not in t.text for t in turns if t.speaker == SPEAKER_AGENT
+    )
