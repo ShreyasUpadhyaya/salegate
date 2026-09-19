@@ -14,3 +14,5 @@ __pycache__/
 .venv/
 .pytest_cache/
 .ruff_cache/
+# Personal build log of phase prompts and replies. Notes to self, not source.
+prompts
