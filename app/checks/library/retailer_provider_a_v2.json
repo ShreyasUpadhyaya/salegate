@@ -36,7 +36,8 @@
       },
       "reason_pass": "Recording disclaimer given before any personal data was collected.",
       "reason_fail": "Recording disclaimer missing, or given after personal data had already been collected.",
-      "source_note": "Reworded from v1 to add an explicit consent clause. Hypothetical future wording, used to test date resolution."
+      "source_note": "Reworded from v1 to add an explicit consent clause. Hypothetical future wording, used to test date resolution.",
+      "match_mode": "verbatim"
     },
     {
       "check_id": "account_holder_confirmation",
@@ -52,7 +53,8 @@
       ],
       "speaker": "agent",
       "reason_pass": "Agent confirmed the account is in the customer's name.",
-      "reason_fail": "Agent never confirmed the account holder."
+      "reason_fail": "Agent never confirmed the account holder.",
+      "match_mode": "confirmation"
     },
     {
       "check_id": "plan_key_information",
@@ -64,7 +66,8 @@
       "approved_text": "this value plan comes with a month to month contract only and provides twenty five Mbps typical download speed and eight point five Mbps typical upload speed from seven PM to eleven PM. The original plan cost is seventy two dollars and ninety per month, but we have an offer ongoing where you will get this plan at forty two dollars and ninety per month for the first six months and then seventy two dollars and ninety. The modem that you will receive is the Netcomm CF forty Wi-Fi six modem, it is one hundred percent free, no extra cost",
       "speaker": "agent",
       "reason_pass": "Agent read the plan key information block.",
-      "reason_fail": "Plan key information was not read, or differed materially from the approved wording."
+      "reason_fail": "Plan key information was not read, or differed materially from the approved wording.",
+      "match_mode": "coverage"
     },
     {
       "check_id": "total_minimum_cost_disclosed",
@@ -76,7 +79,8 @@
       "approved_text": "the total minimum cost will be forty two dollars and ninety only, no setup fee, no any additional cost",
       "speaker": "agent",
       "reason_pass": "Agent disclosed the total minimum cost with no setup or additional fees.",
-      "reason_fail": "Total minimum cost was never disclosed."
+      "reason_fail": "Total minimum cost was never disclosed.",
+      "match_mode": "coverage"
     },
     {
       "check_id": "consent_to_switch",
@@ -90,7 +94,8 @@
       "derived": true,
       "reason_pass": "Agent obtained explicit spoken consent to switch.",
       "reason_fail": "No explicit spoken consent to switch was obtained.",
-      "source_note": "The source call contains no explicit consent question. The customer consents by ticking boxes and submitting the web form, so the agent never asks for spoken agreement. This check is written as the control that absence implies, not quoted from the transcript, and the source call FAILS it. Flagged because it is the one Type A check here whose approved text is not verbatim from the handout."
+      "source_note": "The source call contains no explicit consent question. The customer consents by ticking boxes and submitting the web form, so the agent never asks for spoken agreement. This check is written as the control that absence implies, not quoted from the transcript, and the source call FAILS it. Flagged because it is the one Type A check here whose approved text is not verbatim from the handout.",
+      "match_mode": "confirmation"
     },
     {
       "check_id": "agent_and_company_identification",
@@ -105,7 +110,8 @@
       ],
       "speaker": "agent",
       "reason_pass": "Agent identified themselves and the comparison service.",
-      "reason_fail": "Agent never identified themselves or the company."
+      "reason_fail": "Agent never identified themselves or the company.",
+      "match_mode": "verbatim"
     },
     {
       "check_id": "promo_monthly_price",

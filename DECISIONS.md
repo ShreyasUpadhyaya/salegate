@@ -183,3 +183,24 @@ Consequence and findings, all of which are demo material rather than problems to
   and the real agent's wording, not engine faults. Thresholds were not lowered and the approved text was
   not rewritten to match the recording, because a checklist tuned until the demo passes measures nothing.
   Two critical checks failing on wording is a truthful result and a better demo than a clean sheet.
+
+## D20. Type A checks use three match modes, chosen by what each check means
+Context: a single fixed-window fuzzy match (the spike's approach) works for short lines but breaks on
+long reads. `plan_key_information` is a multi-sentence block; a 1 to 4 turn window either misses most of
+it or needs a threshold so loose it stops meaning anything. Confirmation checks are a different shape
+again: a yes/no exchange, not a script to recite. Decision: each Type A check declares `match_mode` in the
+library, set by the check's nature, never adjusted to make a specific call pass (see the finding in D19).
+- `verbatim`: short fixed lines (disclaimer, self-identification). Unchanged from the spike: window of 1
+  to 4 agent turns, score = max(partial_ratio, token_set_ratio), thresholds 88 PASS / 72 REVIEW.
+- `coverage`: long reads (plan key information, total minimum cost). The approved text is split into
+  sentences, each scored against the joined agent speech, PASS needs 90% of sentences at or above 80. The
+  reason names the missing sentences verbatim, so a TL sees exactly what was skipped, not just a number.
+- `confirmation`: a question-and-answer pair (account holder, consent to switch). The agent's question
+  must score at or above 80, and one of the next two customer turns must read as an affirmative. Evidence
+  cites both turns, since the check is about the exchange, not either side alone.
+Thresholds carried forward unchanged: 88/72 for verbatim, hard rule 7's confidence floor (0.75) downgrades
+any of the three modes to REVIEW. Unknown-speaker turns (D18) additionally lower confidence by 0.1 before
+that floor is applied, since an unresolved speaker is itself a reason not to trust a PASS.
+Consequence: the same engine now gives an honest answer on both a tight verbatim line and a five-sentence
+read, without a threshold tuned to either one specifically. See D19 for what this actually found on the
+self-recorded call: two coverage checks FAIL on paraphrase, not on engine error.

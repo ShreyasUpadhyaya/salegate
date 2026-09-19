@@ -35,7 +35,7 @@ select = ["E", "F", "I", "UP", "B", "ANN", "W"]
 ignore = ["ANN401"]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = ["ANN"]
+"tests/*" = ["ANN", "E501"]
 "scripts/*" = ["ANN"]
 # Depends/Form/File in argument defaults is how FastAPI declares routes.
 "app/api/*" = ["B008"]

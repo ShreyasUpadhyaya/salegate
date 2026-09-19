@@ -39,6 +39,7 @@ class CheckDefinition(BaseModel):
     alternates: list[str] = Field(default_factory=list)
     speaker: str | None = None
     ordering: dict[str, Any] | None = None
+    match_mode: str | None = None  # verbatim | coverage | confirmation, see D20
 
     # Type B
     field: str | None = None
