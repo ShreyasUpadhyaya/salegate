@@ -63,26 +63,30 @@ def build_timeline(transcript: dict, results: list[dict], selected_idx: int | No
                 line_width=0,
             )
 
-    marker_x, marker_y, marker_colour, marker_text, marker_ids = [], [], [], [], []
+    marker_x, marker_y, marker_colour, marker_text, marker_data = [], [], [], [], []
     for result in results:
         for evidence in result.get("evidence", []):
-            marker_x.append(evidence.get("start_s", 0.0))
+            start_s = evidence.get("start_s", 0.0)
+            marker_x.append(start_s)
             marker_y.append(lane_y["note"])
             colour = status_colour(result.get("effective_status", result["status"]))
             marker_colour.append(colour)
-            ts = format_timestamp(evidence.get("start_s", 0.0))
+            ts = format_timestamp(start_s)
             marker_text.append(f"{result['check_id']} — {result['status']} at {ts}")
-            marker_ids.append(result["check_id"])
+            # customdata carries the play time, so a click can set it directly
+            # without re-deriving it from the check id (D22-adjacent: several
+            # evidence lines can share a check id, only the timestamp is unique).
+            marker_data.append([start_s, result["check_id"]])
 
     fig.add_trace(
         go.Scatter(
             x=marker_x,
             y=marker_y,
             mode="markers",
-            marker={"size": 12, "color": marker_colour, "line": {"width": 1, "color": INK}},
+            marker={"size": 14, "color": marker_colour, "line": {"width": 1, "color": INK}},
             text=marker_text,
             hovertemplate="%{text}<extra></extra>",
-            customdata=marker_ids,
+            customdata=marker_data,
             name="checks",
         )
     )
@@ -229,11 +233,22 @@ st.markdown(
 st.divider()
 
 if transcript and transcript.get("utterances"):
-    st.plotly_chart(
+    timeline_event = st.plotly_chart(
         build_timeline(transcript, results, None),
-        use_container_width=True,
+        width="stretch",
         config={"displayModeBar": False},
+        on_select="rerun",
+        selection_mode="points",
+        key="timeline_chart",
     )
+    points = timeline_event.get("selection", {}).get("points", []) if timeline_event else []
+    if points:
+        clicked = points[0]
+        custom = clicked.get("customdata")
+        if custom:
+            st.session_state["play_at"] = float(custom[0])
+            st.session_state["selected_check"] = custom[1]
+    st.caption("Click a marker on the strip to play the call from that second.")
 else:
     st.caption("No transcript available for the timeline strip yet.")
 
