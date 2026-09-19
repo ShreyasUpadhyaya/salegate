@@ -1,0 +1,11 @@
+.env
+data/
+cache/
+handout/
+*.wav
+*.mp3
+*.m4a
+__pycache__/
+.venv/
+.pytest_cache/
+.ruff_cache/
