@@ -37,6 +37,8 @@ ignore = ["ANN401"]
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["ANN"]
 "scripts/*" = ["ANN"]
+# Depends/Form/File in argument defaults is how FastAPI declares routes.
+"app/api/*" = ["B008"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

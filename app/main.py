@@ -1,4 +1,4 @@
-"""FastAPI application. Tables are created on startup, routers land in later phases."""
+"""FastAPI application. Tables are created on startup, more routers land in later phases."""
 
 from __future__ import annotations
 
@@ -8,6 +8,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from pydantic import BaseModel
 
+from app.api.recordings import router as recordings_router
 from app.config import get_settings
 from app.db import create_all
 
@@ -24,6 +25,8 @@ app = FastAPI(
     version="0.1.0",
     lifespan=lifespan,
 )
+
+app.include_router(recordings_router)
 
 
 class Health(BaseModel):
