@@ -28,6 +28,43 @@ _MONTHS = {
 }
 
 
+# Matches a run of number words, optionally with "point" for a decimal, e.g.
+# "twenty five" or "eight point five". Used only to normalise text before Type
+# A coverage matching (D20), so "25 Mbps" and "twenty five Mbps" score equally;
+# never used on Type B extraction, which reads the isolated span itself.
+# Longest words first, same reasoning as _NUMBER_WORD: alternation is
+# first-match, not longest-match.
+_NUMBER_WORD_ALT = "(?:" + "|".join(sorted(_WORDS, key=len, reverse=True)) + ")"
+_SPOKEN_NUMBER_RUN = re.compile(
+    rf"\b{_NUMBER_WORD_ALT}(?:[\s-]+{_NUMBER_WORD_ALT})*"
+    rf"(?:\s+point(?:\s+{_NUMBER_WORD_ALT})+)?\b",
+    re.IGNORECASE,
+)
+
+
+def normalise_spoken_numbers(text: str) -> str:
+    """Replace runs of number words with digits, for text comparison only.
+
+    'twenty five Mbps' -> '25 Mbps', 'eight point five' -> '8.5'. This is a
+    text-normalisation helper for Type A coverage sentence matching (D20), so
+    a call that says the plan speed in words scores the same as one that says
+    it in digits. It is deliberately not used by any Type B extractor: those
+    read an isolated span and parse it directly, per the D14 span-isolation
+    rule, and mixing this general text rewrite into extraction would defeat
+    that isolation.
+    """
+
+    def replace(match: re.Match[str]) -> str:
+        value = words_to_number(match.group(0))
+        if value is None:
+            return match.group(0)
+        if value == int(value):
+            return str(int(value))
+        return str(value)
+
+    return _SPOKEN_NUMBER_RUN.sub(replace, text)
+
+
 def words_to_number(phrase: str) -> float | None:
     """'forty two point nine' -> 42.9, 'twenty five' -> 25. None if it can't parse."""
     phrase = phrase.lower().strip()

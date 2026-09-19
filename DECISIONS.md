@@ -311,3 +311,17 @@ pipeline, and the reasons are traceable to two named, already-documented limitat
 unexplained defect. The gate and evidence-contract tests (`tests/test_gate.py`) assert on the pipeline's
 actual behaviour on both calls, not on the intended script outcome, which is why they check the evidence
 contract and the shape of the decision rather than asserting call 2 is AUTO_SUBMIT.
+
+## D22 addendum: number-word normalisation fixed one of the two call 2 causes
+Bounded 15 minute fix: `normalise_spoken_numbers` in `app/checks/normalise.py` converts runs of number
+words to digits ("twenty five" -> "25", "eight point five" -> "8.5") and is applied only inside
+`score_coverage_check`, on both the approved text and the joined agent speech, before the sentence-level
+fuzzy compare. Type B extraction is untouched: it still reads an isolated span directly, per D14.
+Result on call 2: `plan_key_information` now PASSes. The digit-vs-word mismatch named as cause 1 in D22 is
+resolved. Cause 2, the long merged turn confusing money-role tagging and hiding the email mention, is
+unaffected, as expected, since role-tagging and speaker alignment were explicitly left untouched.
+Call 2 final state: still HELD_TL, now on `ongoing_monthly_price`, `promo_monthly_price` and
+`total_minimum_cost_disclosed` (FAIL) plus `customer_email` (REVIEW), all attributable to the single
+remaining cause, the long merged turn from speaker alignment. Stopping here per instruction: the
+remaining gap is the documented alignment limitation, not a new defect, and fixing it means improving
+alignment's handling of long uninterrupted agent stretches, which is out of scope for a bounded fix.

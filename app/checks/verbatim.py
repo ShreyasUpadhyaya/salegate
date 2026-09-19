@@ -27,6 +27,7 @@ from rapidfuzz import fuzz
 
 from app.checks.library import CheckDefinition
 from app.checks.models import CheckResultDict, TurnDict
+from app.checks.normalise import normalise_spoken_numbers
 from app.config import LOW_STT_CONFIDENCE, VERBATIM_PASS_THRESHOLD, VERBATIM_REVIEW_THRESHOLD
 
 # Coverage checks (long reads) need this fraction of their sentences said.
@@ -215,17 +216,26 @@ def score_coverage_check(check: CheckDefinition, turns: list[TurnDict]) -> Check
     """Long read: what fraction of the approved sentences did the agent say.
 
     Missing sentences are named verbatim in the reason, so a TL sees exactly
-    what was skipped rather than a bare score.
+    what was skipped rather than a bare score. Both sides are normalised to
+    digits before comparing ("twenty five Mbps" and "25 Mbps" score the same),
+    since the approved text is quoted from the CIMET transcript in word form
+    (D19) but a real call may say the same figure in digit form. Type B
+    extraction never uses this normaliser: it reads an isolated span directly,
+    per the D14 span-isolation rule, and this is a text-comparison rewrite,
+    not a value parse.
     """
     agent_turns = _agent_turns(turns)
-    joined_agent = _normalise(" ".join(t.get("text_redacted", "") for t in agent_turns))
+    joined_agent = normalise_spoken_numbers(
+        _normalise(" ".join(t.get("text_redacted", "") for t in agent_turns))
+    )
     sentences = _split_sentences(check.approved_text or "")
 
     said: list[str] = []
     missing: list[str] = []
     sentence_scores: list[float] = []
     for sentence in sentences:
-        score = fuzz.partial_ratio(_normalise(sentence), joined_agent)
+        sentence_digits = normalise_spoken_numbers(_normalise(sentence))
+        score = fuzz.partial_ratio(sentence_digits, joined_agent)
         sentence_scores.append(score)
         (said if score >= COVERAGE_SENTENCE_THRESHOLD else missing).append(sentence)
 
