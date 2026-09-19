@@ -12,10 +12,11 @@ into `app/checks/` with real types and tests. Never import it directly, never co
 
 ## Hard rules (never break)
 1. Test data only for anything invented. Use the CIMET synthetic leads and provided files. Never invent real-looking PII.
-2. The provided recording is real and is fine to transcribe, score and show live, since CIMET gave it to us for exactly
-   that. It never leaves the room in written form: never commit the audio file, its full transcript, `.env`, `data/`,
-   or `cache/`. Check `git status` before every commit. Any evidence text that reaches `results/` or a commit quotes
-   the check outcome, not the customer's actual email, phone, DOB or address. See DECISIONS D13.
+2. CIMET provided no audio, only `handout/transcript.pdf`. We record our own call from our own script, solo and
+   single channel, and transcribe it with diarization, so there is no real customer in it. Keep the handling rules
+   anyway: never commit the audio file, its full transcript, `.env`, `data/`, or `cache/`. Check `git status` before
+   every commit. Any evidence text that reaches `results/` or a commit quotes the check outcome, not the actual
+   email, phone, DOB or address. See DECISIONS D17.
 3. Never print, log or echo API keys. Read them from `.env` through `app/config.py` only.
 4. Card numbers are redacted before storage (Deepgram `redact=pci` plus local Luhn pass). Digits are never stored, logged or shown.
 5. The system never edits CRM fields, never rewrites the sale, never contacts a customer. It reports and holds.

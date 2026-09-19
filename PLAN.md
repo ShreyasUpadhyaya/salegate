@@ -24,7 +24,7 @@ Depth on one path beats breadth.
 
 ## Architecture
 Audio source: `data/recordings/demo/call.wav`, self-recorded from our own script, single channel,
-diarized. CIMET provided no recording, only a flat transcript. See DECISIONS D17.
+diarized. CIMET provided no recording, only `handout/transcript.pdf`. See DECISIONS D17.
 ```
 dialler_sim.py --POST--> /api/dialler/recordings (lead_id, call_started_at, agent_id, audio)
                               |  202 Accepted, idempotent on lead_id + sha256(audio)
@@ -98,7 +98,7 @@ app/api/        leads.py, scores.py, overrides.py, dashboards.py
 ui/             Home.py, pages/1_Lead_review.py, 2_Queues.py, 3_Dashboards.py, theme.py
 scripts/        dialler_sim.py, seed_history.py, eval_agreement.py, reset_db.py
 tests/          test_normalise.py, test_verbatim.py, test_factual.py, test_gate.py, test_guardrails.py
-handout/        CIMET files: flat transcript, leads, check library (gitignored)
+handout/        transcript.pdf and any later CIMET files (gitignored)
 results/        agreement.md, scored_leads.json, screenshots/
 docs/           data_notes.md, architecture.png (optional)
 reference/      spike/, tonight's rehearsal code, port from it, never import it, never ship it
@@ -172,7 +172,7 @@ holds the hard rules in CLAUDE.md, whether the evidence contract and gate logic 
 it actually runs. This is a second pass, not a replacement for testing before each commit.
 
 ## Fallback if the handout arrives late or not at all
-Partly resolved: CIMET confirmed the handout is a flat transcript and no recording (D17). The audio
+Partly resolved: CIMET confirmed the handout is a PDF transcript and no recording (D17). The audio
 fallback is gone because we make the audio ourselves. What follows still applies to the check library
 and lead data.
 Phases 5 to 7 need a check library and a lead. If `handout/` is still empty when Phase 5 starts, seed the

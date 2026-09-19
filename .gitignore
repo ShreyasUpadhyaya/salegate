@@ -1,5 +1,10 @@
 .env
-data/
+# Ignore data/ contents, but not the directory itself, so the negations below can work.
+data/*
+# The recording script is hand-authored source, not generated data.
+!data/scripts/
+data/scripts/*
+!data/scripts/*.md
 cache/
 handout/
 *.wav

@@ -97,11 +97,11 @@ auditable in a document rather than buried in code, and a mis-typed check surfac
 false PASS.
 
 ## D17. We record the test call ourselves, and diarization is now primary
-Context: at the opening ceremony CIMET confirmed no audio recording is provided. The handout is a flat
-transcript with no timestamps and no speaker labels, so it cannot drive a pipeline whose whole value is
+Context: at the opening ceremony CIMET confirmed no audio recording is provided. The handout is a redacted
+PDF transcript with no timestamps and no speaker labels, so it cannot drive a pipeline whose whole value is
 utterance timings and speaker attribution. The guardrails and the three check types are also ours to
 interpret rather than a fixed spec. Decision, in three parts:
-- `handout/transcript.txt` is source material for writing our own call script, not pipeline input. We read
+- `handout/transcript.pdf` is source material for writing our own call script, not pipeline input. We read
   it to learn the real script content and how agents actually talk, then write a script from it.
 - We record that script ourselves: solo, one voice performing both parts, in a single continuous take.
   Agent lines and customer lines are read in a clearly different tone and pace, with a 1 to 2 second pause
