@@ -224,3 +224,46 @@ than by inspection.
   stays FAIL rather than softening into REVIEW: the recording's "can I confirm you are the account holder"
   is enough removed from both v1 phrasings that treating it as the same exchange would be a stretch, not a
   near-miss.
+
+## D21. Type B factual checks: span isolation, role-tagged prices, catastrophic backtracking
+Context: PLAN.md Phase 7. Ported reference/spike/factual.py and normalise.py, extending the D14
+span-isolation fix from email to every Type B extractor: money, promo term, download speed, modem, DOB
+and address all isolate their value's span with a targeted regex before parsing, never a whole-utterance
+scan. Several real bugs surfaced only by running the real cached call, not by the fixtures written first.
+- **Catastrophic backtracking.** The money, term and speed regexes used an unbounded nested quantifier,
+  `((?:[a-z]+[\s-]?)+?)`, to capture a run of number words. Against long agent turns that contain no money
+  at all (most of them), this pattern's ambiguity made matching take effectively forever: the whole scoring
+  pass hung on the very first turn. Fixed by bounding the word count (`{1,4}`, `{1,3}`) instead of leaving
+  it open-ended, which removes the exponential blowup entirely. Any future spoken-number extractor must use
+  a bounded repeat, never `(word[\s-]?)+`.
+- **Alternation is first-match, not longest-match.** `_NUMBER_WORD`'s word list had "nine" before "ninety"
+  and "nineteen", so "ninety" matched only its first four letters and silently produced 42.09 instead of
+  42.90. Fixed by ordering the longest words first and adding `\b` boundaries. Same class of bug as the
+  ReDoS above: an assumption about regex engine behaviour that fixtures alone did not test hard enough to
+  catch, only the real call's actual phrasing did.
+- **Two prices in one turn need a role, not just a value.** The call states both the promo and ongoing
+  price, often in the same turn ("$42.90 a month, then $79.90 ongoing"), sometimes with the qualifying
+  word before the figure and sometimes after. A bare list of quoted numbers cannot tell one check's field
+  from the other, so `extract_money_mentions` returns `(value, role)` pairs, tagging each mention "promo",
+  "ongoing" or "unknown" from marker words in a window either side of it, bounded by the nearest sentence
+  punctuation so a marker belonging to the next sentence is never pulled onto this mention. When a turn has
+  a confidently tagged mention of the OTHER role, `score_money_check` treats a same-turn "unknown" mention
+  as noise from that other price, not a second claim on this field.
+- **Numeric DOB is genuinely ambiguous, resolved by falling through.** Day-first is the default (en-AU).
+  When the first number exceeds 12 it must be the day (unambiguous). The bug: the code checked only "is the
+  first number too big to be a month", not the mirror case "is the second number too big to be a month",
+  so Deepgram's `03/14/1990` (US month/day order) fell through as an invalid day-first reading and was
+  silently dropped rather than re-read the other way. Fixed by checking both directions before giving up.
+- **State name mismatch cost the address check its fuzzy score.** The agent reads "New South Wales" in
+  full; the CRM stores "NSW". Both otherwise-identical addresses fuzzy-matched at 82, under the 90
+  threshold, purely on the state spelling. `normalise_state_names` maps full Australian state and
+  territory names to their abbreviation before the fuzzy compare.
+- **Modem letters can arrive spaced.** "netcomm cf40" is sometimes transcribed "netcom c f 40"; the model
+  regex required "cf" adjacent and missed the spaced form. Fixed to accept a space between the letters.
+Consequence: every one of these was found by running the actual 70-utterance call through the evaluators,
+not by the hand-written fixtures, which is why PLAN.md's real-call assertions matter as much as the
+per-extractor unit tests. Call 1 result after all fixes: `ongoing_monthly_price` and `customer_email` FAIL
+correctly (both are the deliberate script faults), `promo_monthly_price`, `customer_dob`,
+`plan_download_speed` and `service_address` PASS, `modem_model` REVIEWs because the modem line landed on a
+customer turn under speaker alignment (D18), not an agent one, so the "agent turns only" rule for this
+field correctly finds no mention to check.
