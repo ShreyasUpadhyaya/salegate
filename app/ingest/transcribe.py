@@ -139,12 +139,33 @@ def identify_agent_speaker(utterances: list[dict[str, Any]]) -> int | None:
     return None
 
 
-def parse_utterances(payload: dict[str, Any]) -> list[dict[str, Any]]:
+def parse_utterances(
+    payload: dict[str, Any], script_path: Path | None = None
+) -> list[dict[str, Any]]:
     """Flatten Deepgram utterances into the rows we store.
 
-    Returns dicts, not ORM objects, so this stays pure and testable.
+    Returns dicts, not ORM objects, so this stays pure and testable. When
+    diarization found only one speaker the turns are recovered by aligning
+    against the read script instead (DECISIONS D18).
     """
+    from app.ingest.speakers import diarization_speaker_count, resolve_speakers
+
     raw = payload.get("results", {}).get("utterances") or []
+    if raw and script_path is not None and diarization_speaker_count(raw) < 2:
+        turns = resolve_speakers(payload, script_path)
+        return [
+            {
+                "idx": idx,
+                "speaker": turn.speaker,
+                "start_s": turn.start_s,
+                "end_s": turn.end_s,
+                "text_redacted": turn.text,
+                "avg_confidence": turn.confidence,
+                "speaker_source": turn.speaker_source,
+            }
+            for idx, turn in enumerate(turns)
+        ]
+
     agent_speaker = identify_agent_speaker(raw)
 
     rows: list[dict[str, Any]] = []
@@ -167,6 +188,7 @@ def parse_utterances(payload: dict[str, Any]) -> list[dict[str, Any]]:
                 "end_s": float(utterance.get("end", 0.0)),
                 "text_redacted": (utterance.get("transcript") or "").strip(),
                 "avg_confidence": float(utterance.get("confidence", 0.0)),
+                "speaker_source": "diarization",
             }
         )
     return rows
@@ -205,7 +227,7 @@ def transcribe_recording(
 
     try:
         payload = fetch_transcript(audio_path, recording.sha256, use_cache=use_cache)
-        rows = parse_utterances(payload)
+        rows = parse_utterances(payload, script_path=get_settings().recorded_script_path)
     except TranscriptionError:
         recording.state = RecordingState.FAILED
         session.commit()

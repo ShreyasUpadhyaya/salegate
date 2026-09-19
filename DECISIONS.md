@@ -113,3 +113,36 @@ Consequence: D13's real-recording privacy concern no longer applies, since there
 our audio. The recording is fully ours to use, commit and publish. The pipeline is unchanged in shape: it
 still ingests audio, transcribes with speakers and timings, and scores against the library. The risk moves
 from privacy to diarization quality, which the deliberate pauses and tone contrast are there to manage.
+
+## D18. Speakers come from script alignment when diarization finds one voice
+Context: the demo call is one person reading both roles (D17). Deepgram nova-3 returned speaker 0 for all
+70 utterances, so every turn was labelled agent and talk ratio read 100%. Worse, it merged speaker changes
+into single utterances: the recording disclaimer and the customer's "Yeah, that's fine" arrived as one row.
+The first plan was to split turns on word-level silence, but the data ruled that out. The largest gap
+between any two words in the whole call is 0.39s, and at several real speaker boundaries it is 0.00s. No
+threshold separates turns, because the 1 to 2 second pauses that were recorded are not in the word timings.
+Decision:
+- Diarization stays the first choice. If Deepgram returns two or more speakers its labels are used and the
+  script is never consulted.
+- When it returns one speaker, turns are recovered by aligning the word stream against the ordered
+  AGENT/CUSTOMER lines of the script that was actually read, `data/scripts/recorded_script.md`. The
+  alignment is monotonic: it walks forward through the script and never revisits a line, so a repeated
+  phrase cannot pull attribution backwards. Word timings give each recovered turn an exact start and end.
+- Matching uses rapidfuzz `ratio` as the backbone, with `partial_ratio` and `token_set_ratio` damped by how
+  much of the line the run covers. Undamped, both score 100 on a single word inside a long line and the
+  aligner cuts a turn after one word.
+- Below a match score of 70 (`SPEAKER_MATCH_MIN_SCORE`) the speaker is `unknown` and the turn's confidence
+  is capped at 0.5, so a critical check that leans on it routes to REVIEW and never PASSes (hard rule 7).
+- Every utterance stores `speaker_source`, either `diarization` or `script_alignment`, and the UI shows it
+  so a reviewer knows how the speaker was decided.
+- Word gaps are kept only as a tie-breaker between two near-equal candidate lines.
+- A redaction token forces a turn boundary. The token joins the text before it as one turn labelled
+  customer, since card data is spoken by the customer, and the words after it are re-aligned from that
+  point. Without this the customer's card offer, the redacted digits and the agent's refusal fuse into one
+  agent turn, which reads in the UI as the agent reciting a card number.
+Consequence: this is a demo-only adapter for a single-voice recording, not a production mechanism. In
+production the dialler supplies dual-channel audio, one party per channel, and speakers come from the
+channel, which is the real fix. It is honest to show because we own the script being aligned against.
+Measured on the demo call: 8 of 9 check-bearing lines attributed correctly before the redaction-token rule,
+talk ratio 87.2% agent to 12.8% customer, and turn boundaries land within a word or two of the true change,
+which the windowed Type A matching absorbs.

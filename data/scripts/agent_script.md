@@ -35,20 +35,28 @@ the system redacted it anyway" is a stronger story than a call where the topic n
 
 ## Test values used in this script
 
-| Field | CRM value (the truth) | What the agent says | Result |
-|---|---|---|---|
-| Promo price | 42.90 | 42.90 | match |
-| Ongoing price | 72.90 | **79.90** | **deliberate mismatch, Type B FAIL** |
-| Promo term | 6 months | 6 months | match |
-| Download speed | 25 Mbps | 25 Mbps | match |
-| Upload speed | 8.5 Mbps | 8.5 Mbps | match |
-| Email | jordan.avery@example.com | "j dot avery at example dot com" | **missing first name, Type B REVIEW or FAIL** |
-| Mobile | 0400 000 118 | 0400 000 118 | match |
-| DOB | 14 March 1982 | 14 March 1982 | match |
-| Modem | Netcomm CF40 | Netcomm CF40 | match |
-| Total minimum cost | 42.90 | 42.90 | match |
+> **Superseded by the recording.** The call was read from `data/scripts/recorded_script.md`, not from this
+> file, and the values below are the ones actually spoken. The CRM fixture and rate card must match this
+> table. Wording differs too: the call opens "Hi, is this Jordan?", not "Good afternoon, am I speaking with
+> Jordan Avery?". Speaker alignment reads `recorded_script.md` only. See DECISIONS D18.
 
-Two deliberate faults, one obvious and one subtle, so the demo shows both a clean catch and a
+| Field | CRM / rate card value (the truth) | What the agent says | Result |
+|---|---|---|---|
+| Plan | NBN 25 Mbps | NBN 25 | match |
+| Promo price | 42.90 per month, first 6 months | 42.90 | match |
+| Promo term | 6 months | 6 months | match |
+| Ongoing price | 72.90 | **79.90, said twice** | **deliberate mismatch, Type B FAIL** |
+| Download speed | 25 Mbps typical evening | 25 Mbps | match |
+| Email | jordan.avery@example.com | "j dot avery at example dot com" | **deliberate mismatch, Type B FAIL** |
+| DOB | 14 March 1990 | 14 March 1990 | match, see note below |
+| Address | 12 Sample Street, Testville NSW 2000 | same | match |
+| Modem | Netcomm CF40, free | Netcomm CF40, free | match |
+| Account number | ACC44721 | ACC44721 | match |
+
+Deepgram transcribes the spoken DOB as `03/14/1990`, US month-first order. The date normaliser must read
+day-first by default and accept month-first only when the first number is above 12, which makes this one
+unambiguous. Tests cover both orders.
+
 low-confidence route to REVIEW.
 
 ---

@@ -102,6 +102,9 @@ class Utterance(Base):
     end_s: Mapped[float] = mapped_column(Float)
     text_redacted: Mapped[str] = mapped_column(String)
     avg_confidence: Mapped[float] = mapped_column(Float, default=0.0)
+    # diarization | script_alignment. Shown in the UI so a reviewer knows how the
+    # speaker was decided. See DECISIONS D18.
+    speaker_source: Mapped[str] = mapped_column(String(24), default="diarization")
 
     recording: Mapped[Recording] = relationship(back_populates="utterances")
     words: Mapped[list[Word]] = relationship(back_populates="utterance")

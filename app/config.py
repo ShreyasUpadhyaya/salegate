@@ -31,6 +31,9 @@ class Settings(BaseSettings):
     db_path: Path = PROJECT_ROOT / "data" / "app.db"
     audio_dir: Path = PROJECT_ROOT / "data" / "recordings"
     cache_dir: Path = PROJECT_ROOT / "cache"
+    # The script that was actually read on the demo call, used to recover speaker
+    # turns when diarization returns a single speaker (DECISIONS D18).
+    recorded_script_path: Path = PROJECT_ROOT / "data" / "scripts" / "recorded_script.md"
 
     qa_sample_percent: int = Field(default=5, ge=0, le=100)
 
@@ -60,6 +63,13 @@ LOW_STT_CONFIDENCE = 0.75
 
 # Type B factual comparisons.
 RATE_TOLERANCE_C_PER_KWH = 0.05
+
+# Speaker attribution when diarization returns one speaker (DECISIONS D18).
+# Below this rapidfuzz score a turn's speaker is unknown, not guessed.
+SPEAKER_MATCH_MIN_SCORE = 70.0
+# An unknown speaker caps the turn's confidence, so a critical check that leans
+# on it routes to REVIEW instead of PASS (hard rule 7).
+UNKNOWN_SPEAKER_CONFIDENCE = 0.5
 
 # Type C behaviour notes, seconds.
 DEAD_AIR_THRESHOLD_S = 20.0

@@ -132,7 +132,7 @@ Commit messages: plain English, max 2 lines, no prefixes, no trailers. Nothing i
 | 15:25 to 15:30 | Reset DB, seed, final run, tag `v1.0` | Tag pushed | `Final demo data and results snapshot` |
 | 15:30 to 16:00 | Record backup video, rehearse demo twice | Video link ready | (optional) `Add the demo video link to the README` |
 
-Optional if ahead of time (insert after 12:50): `Send only unresolved semantic checks to Gemini, cached and cited`.
+~~Optional: send unresolved semantic checks to Gemini~~ Cut at 12:20, see the cut list.
 
 ## Reference: tonight's rehearsal spike (`reference/spike/`)
 Before build day, the riskiest logic was pressure-tested against CIMET's own worked example
@@ -182,8 +182,10 @@ changes. Swap in the real export the moment it lands, since the loader reads fro
 
 ## Cut list, in order, if behind
 1. Word-level table (keep utterances only).
-2. Docker compose.
-3. LLM adjudicator (semantic checks go to REVIEW instead).
+2. ~~Docker compose~~ **CUT at 12:20.** Never started, nothing depends on it.
+3. ~~LLM adjudicator~~ **CUT at 12:20.** Unresolved semantic checks go to REVIEW instead, which is the
+   behaviour hard rule 10 already requires when the LLM is unavailable. `llm_enabled` stays false.
+   Time reclaimed after Phase 3 ran over on speaker recovery (DECISIONS D18).
 4. Campaign/site rollups (keep agent and retailer).
 5. Never cut: ingestion, gate, evidence contract, click-to-play, overrides log, agreement results.
 
